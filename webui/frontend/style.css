@@ -5637,6 +5637,8 @@ flex: 1 1 auto;
   gap: 22px;
   align-items: start;
   min-height: 320px;
+  width: min(100%, 1200px);
+  margin-right: auto;
 }
 .settings-nav {
   display: flex;

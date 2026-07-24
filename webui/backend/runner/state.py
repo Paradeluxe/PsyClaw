@@ -91,6 +91,29 @@ class StateMachine:
         self._write_state_file()
         self._append_event("created", note="run created")
 
+    @classmethod
+    def from_disk(cls, run_dir: str) -> "StateMachine":
+        """Load a persisted run without changing its state or event files."""
+        state_path = os.path.join(run_dir, "state.json")
+        with open(state_path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        state = str(data.get("status") or RunState.CREATED.value)
+        if state not in RunState.values():
+            raise ValueError(f"unknown persisted state: {state!r}")
+
+        sm = cls.__new__(cls)
+        sm.run_id = str(data.get("run_id") or os.path.basename(run_dir))
+        sm.run_dir = run_dir
+        sm.paradigm_id = str(data.get("paradigm_id") or "")
+        spec = data.get("spec")
+        sm.spec = dict(spec) if isinstance(spec, dict) else {}
+        sm.started_at = float(data.get("started_at") or time.time())
+        sm._state = state
+        sm._lock = threading.Lock()
+        sm.headless = data.get("headless")
+        sm.design = data.get("design") if isinstance(data.get("design"), dict) else None
+        return sm
+
     # --- accessors --------------------------------------------------------
 
     @property
@@ -199,6 +222,8 @@ class StateMachine:
             "status": self._state,
             "started_at": self.started_at,
             "spec": self.spec,
+            "headless": getattr(self, "headless", None),
+            "design": getattr(self, "design", None),
         }
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:

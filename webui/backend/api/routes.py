@@ -14,9 +14,8 @@ Endpoints (all under /api):
 
 Implementation notes
 --------------------
-- The "process" backing runs is a MockProcess (see ``runner/process.py``);
-  the real PsychoPy runner will be a drop-in replacement and won't change
-  the route signatures or the state machine.
+- Runs use ``PsychoPyProcess`` when PsychoPy is available and ``MockProcess``
+  for explicit/offline simulation; both share the same route contract.
 - Each run has its own on-disk directory ``runs/<id>/`` containing
   ``state.json``, ``events.jsonl``, ``log.txt`` and ``data/`` (see runner/state.py).
 - We also keep an in-memory map of run_id -> StateMachine for the lifetime
@@ -25,13 +24,9 @@ Implementation notes
 """
 from __future__ import annotations
 
-import re
-
 import json
 import re
 import os
-import subprocess
-import sys
 import threading
 import time
 import uuid
@@ -260,10 +255,12 @@ def _run_lifecycle(sm: StateMachine, spec: Dict[str, Any]) -> None:
             sm.transition_to("running", note="launching experiment (mock)")
             participant_id = str(spec.get("participant_id", "P01"))
             n_trials = int(spec.get("n_trials") or (spec.get("n_go", 0) + spec.get("n_nogo", 0)) or 10)
+            mock_spec = dict(spec)
+            mock_spec.update({"participant_id": participant_id, "n_trials": n_trials})
             process = MockProcess(
                 run_id=sm.run_id,
                 run_dir=sm.run_dir,
-                spec={"participant_id": participant_id, "n_trials": n_trials},
+                spec=mock_spec,
                 duration_s=2.0,
             )
             process.start()
@@ -1063,21 +1060,10 @@ def _get_run_state_machine(run_id: str) -> Optional[StateMachine]:
             data = json.load(fh)
     except (OSError, json.JSONDecodeError):
         return None
-    # Construct a StateMachine at the same state WITHOUT touching files.
-    sm = StateMachine(
-        run_id=run_id,
-        run_dir=run_dir,
-        paradigm_id=data.get("paradigm_id", ""),
-        spec=data.get("spec", {}),
-    )
-    # Fast-forward to the persisted state by re-applying transitions in
-    # memory (no new events written — we don't re-emit transitions that
-    # were already recorded on disk).
-    target = data.get("status", RunState.__members__.get("CREATED", "created"))
-    with sm._lock:  # noqa: SLF001 — internal but acceptable for rehydration
-        sm._state = target  # noqa: SLF001
-        sm.started_at = data.get("started_at", sm.started_at)  # noqa: SLF001
-    return sm
+    try:
+        return StateMachine.from_disk(run_dir)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
 
 
 @api_bp.route("/runs/<run_id>", methods=["GET"])

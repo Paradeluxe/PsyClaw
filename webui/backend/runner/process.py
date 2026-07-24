@@ -1,14 +1,8 @@
 """Process management for psyclaw-webui runs.
 
-Real implementation (future): spawn a PsychoPy Python subprocess that
-executes a generated script under ``examples/templates/<script_template>``,
-streaming stdout to ``runs/<id>/log.txt`` and writing trial data to
-``runs/<id>/data/``.
-
-For now we ship a ``MockProcess`` that pretends to do that, so the rest of
-the platform (state machine, routes, UI polling) has something real to talk
-to. The interface is small and stable so swapping in a real subprocess
-later won't require touching ``routes.py`` or the state machine.
+``PsychoPyProcess`` in the sibling module runs generated experiments.
+This module supplies the shared process interface plus ``MockProcess`` for
+offline/autopilot simulation with the same run/data contract.
 
 Public API
 ----------
@@ -34,18 +28,18 @@ from __future__ import annotations
 import csv
 import os
 import random
+import shutil
 import threading
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
 class BaseProcess:
     """Interface that real + mock runners implement.
 
-    The real PsychoPy runner will be a thin wrapper around
-    ``subprocess.Popen`` that pipes stdout into ``runs/<id>/log.txt``.
-    The mock matches the same lifecycle so the state machine and routes
-    don't need to special-case it.
+    The mock matches the real runner lifecycle so the state machine and
+    routes don't need separate status or artifact handling.
     """
 
     def __init__(self, run_id: str, run_dir: str, spec: Dict[str, Any]) -> None:
@@ -156,6 +150,15 @@ class MockProcess(BaseProcess):
                 row["participant_id"] = self.participant_id
                 writer.writerow(row)
         self._write_log(f"[mock] wrote {n_rows} trial rows -> {path}")
+        project_path = str(self.spec.get("project_path") or "").strip()
+        if not project_path and isinstance(self.spec.get("session"), dict):
+            project_path = str(self.spec["session"].get("project_path") or "").strip()
+        if project_path:
+            destination_dir = Path(project_path) / "data"
+            destination_dir.mkdir(parents=True, exist_ok=True)
+            destination = destination_dir / Path(path).name
+            shutil.copy2(path, destination)
+            self._write_log(f"[mock] mirrored {Path(path).name} -> {destination}")
 
     def _run(self) -> None:
         self._write_log(f"[mock] start pid=mock duration={self.duration_s}s trials={self.n_trials}")

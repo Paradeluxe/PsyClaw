@@ -104,8 +104,8 @@ def _health_is_psyclaw(port: int) -> bool:
                 return False
             raw = resp.read().decode("utf-8", errors="replace")
             data = json.loads(raw) if raw.strip().startswith("{") else {}
-            app = str(data.get("app") or data.get("status") or "").lower()
-            return "psyclaw" in app or data.get("status") in ("ok", "healthy", "up")
+            app = str(data.get("app") or "").strip().lower()
+            return app == "psyclaw-webui" and data.get("status") == "ok"
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, OSError):
         return False
 

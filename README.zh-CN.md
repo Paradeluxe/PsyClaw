@@ -122,45 +122,57 @@ python skills/psyclaw/scripts/doctor.py
 
 ## 管线优化计划（todo）
 
-0.3.6 瘦身后评审。主干不动：
+主干不动：
 
 `输入 → 文献？ → 澄清 → 写入 → 校验 → 问是否开跑 → 交接 webui`
 
-下一波收益在 **每步可检查、可默认、可少加载**，不再重画流程图。
+### 已完成 — skill 管线（≤0.3.11）
 
-### P0 — 执行层（agent 最易翻车）
+- [x] 会话状态 `.psyclaw-session.json` · validate · marker stub · intent 去重
+- [x] lit 负面样例 · ask-run 每会话一次 · norms 拆分 core/附录
+- [x] handoff 分层（run-prep / api-notes）· failure-playbooks
 
-- [x] **会话状态文件** — `<projectDir>/.psyclaw-session.json`（OutPath 前用 cwd）；`session-state.md` + stub（0.3.9）；以文件为准
-- [x] **Validate 可执行** — `references/marker-validate.md`（硬检查 1–7 + 软警告 + 可选 compile）
-- [x] **最小合法 stub** — `references/marker-stub.psyclaw`；SKILL/pipeline 已挂接（0.3.7）
-- [x] **Intent 表去重** — SKILL 只留 Load first；流程仅 `skill-pipeline.md`（0.3.10）
+### 已完成 — webui / monorepo（2026-07-25 · `c34b497`+）
 
-### P1 — 对话 / 闸门
+- [x] **启动器 identity** — health 只认 `app=="psyclaw-webui" && status=="ok"`；脏端口 exit 1
+- [x] **历史 run 只读重载** — `StateMachine.from_disk()`；不再 finished→created
+- [x] **mock CSV 镜像** — 完成也写 `<project>/data/`
+- [x] **回归** — launcher / state / API flows / frontend smoke（66 tests）
+- [x] **Settings 宽屏** — 限宽 1200px
+- [x] **push `main`** + GitHub **default_branch → main**（monorepo 为默认面）
+- [x] **本机脏 8876** 旧 minimal 已清；真 webui 接管
+- [x] **Hermes 装机 skill** 与 monorepo `skills/psyclaw/` 对齐
 
-- [x] **每轮一个 topic cluster** — 硬规则 + norms-core 已允许
-- [x] **Lit 误触发负面样例** — 可行性/概念/空专业 ≠ lit（0.3.10）
-- [x] **Ambiguous「专业」默认** — 一问后无答则 norms 默认（0.3.10）
-- [x] **Ask-run 每会话一次** — session 字段 `ask_run`；已设置则不再弹问（0.3.9）
+### 未完成 — 下一刀
 
-### P2 — norms 加载重量（约 251 行）
+#### P1 — 仓库 / 分发卫生
 
-- [x] **拆分 norms** — `norms-core.md` / `norms-trial-n.md` / `norms-counterbalance.md` / `norms-marker-map.md`（0.3.8）
-- [x] **默认只 load core**；N/平衡/字段映射再 load 附录；旧文件改为索引
-- [x] **checklist #1–3 可合并** — core 允许快速用户一句 design one-liner
+- [ ] **私有仓 `Paradeluxe/psyclaw-webui` 归档策略** — monorepo `webui/` 已是真源；私有仓停在 `404b003`（debug 8877）。选：归档 / README 指向 monorepo / 或标 deprecated
+- [ ] **`master` 旧 skill-only 线** — default 已切 main；决定是否 archive/delete `master` 或加 banner 防误 clone
+- [ ] **装机路径文档** — SKILL/README 仍可能写 `Paradeluxe/psyclaw-skill`；统一为 `Paradeluxe/psyclaw`（`skills/psyclaw`）
+- [ ] **一次安装 skill+webui** — `install-all.bat` / `install-full.sh` 实机验收 + 文档入口写清
 
-### P3 — 产品边界
+#### P2 — webui 产品抛光
 
-- [x] **Handoff 分层** — `run-prep.md` vs `api-notes.md`；`webui-handoff.md` 为索引（0.3.11）
-- [x] **失败剧本** — `failure-playbooks.md`
-- [x] **收工 5 勾** — 见 `run-prep.md`
+- [ ] **System 状态表达** — PsychoPy 警告 / mock runner / `n/a` graphics 要有可见原因或详情入口；`可 Pilot` 语义与色一致
+- [ ] **长设备名截断** — I/O 扬声器等：title 悬停完整名或换行
+- [ ] **Display 黑预览空洞感** — 边界/棋盘/「黑色输出」说明（勿为等高硬改音频卡）
+- [ ] **Run 空态** — roster 0 行时更轻；Instrument 全 `—` 时分组或折叠
+- [ ] **前端大拆模块** — `app.js` / `builder.js` 分文件（另开任务，勿顺手大改）
+
+#### P3 — 本地 vault（无 remote）
+
+- [ ] **`psyclaw-vault` 收尾 commit** — 旧 pipeline 56 删除 + `experiments/` untracked；确认后 commit（仍无 remote）
+- [ ] **vault 与 monorepo 边界** — 文档一句：vault = 本地 papers/experiments，不是产品仓
 
 ### 建议排期
 
-1. ~~Validate + stub~~  
-2. ~~拆 norms~~  
-3. ~~会话状态文件~~  
-4. ~~Intent 去重 + lit 负面样例~~  
-5. ~~Handoff + 失败剧本~~ — **已完成（0.3.11）**  
+1. 私有 webui 仓归档文案 + master banner  
+2. 文档路径统一 monorepo  
+3. install-all 实机一次装通  
+4. System/Run 状态与空态抛光  
+5. 前端拆模块（独立 PR）  
+6. vault commit（仅本地）
 
 ## 许可证
 

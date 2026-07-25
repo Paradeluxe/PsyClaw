@@ -122,6 +122,58 @@ psyclaw/
 python skills/psyclaw/scripts/doctor.py
 ```
 
+## Optimization plan (todo)
+
+Trunk stays:
+
+`input → lit? → clarify → write → validate → ask-run → webui handoff`
+
+### Done — skill pipeline (≤0.3.11)
+
+- [x] session file · validate · marker stub · intent dedupe · lit negatives · norms split · handoff layers
+
+### Done — webui / monorepo (2026-07-25 · `c34b497`+)
+
+- [x] launcher identity (`app=="psyclaw-webui"`)
+- [x] historical run read-only rehydrate (`StateMachine.from_disk`)
+- [x] mock CSV mirror to `<project>/data/`
+- [x] regressions (66 tests) · Settings max-width 1200px
+- [x] push `main` · GitHub **default_branch → main**
+- [x] clear stale :8876 minimal sim · Hermes install skill synced to monorepo
+
+### Open
+
+#### P1 — repo / distribute
+
+- [ ] archive strategy for private `Paradeluxe/psyclaw-webui` (monorepo `webui/` is source of truth)
+- [ ] old `master` skill-only line: archive/delete or banner
+- [ ] docs still saying `psyclaw-skill` → `Paradeluxe/psyclaw` + `skills/psyclaw`
+- [ ] one-shot install skill+webui (`install-all.bat` / `install-full.sh`) real-machine verify
+
+#### P2 — webui polish
+
+- [ ] System status explainer (PsychoPy warn / mock / n/a graphics); unify `可 Pilot` semantics
+- [ ] long device-name truncation (title/hover)
+- [ ] Display black-preview emptiness (border/checker/label) — do not force audio-card height match
+- [ ] Run empty states (roster 0 / Instrument all —)
+- [ ] split large frontend (`app.js` / `builder.js`) — separate task
+
+#### P3 — local vault (no remote)
+
+- [ ] commit vault teardown residue + `experiments/` smoke
+- [ ] one-line boundary: vault = local papers/experiments, not the product repo
+
+### Suggested order
+
+1. private webui archive note + master banner  
+2. monorepo path docs  
+3. install-all smoke  
+4. System/Run polish  
+5. frontend split (own PR)  
+6. vault local commit  
+
+Fuller Chinese checklist: [README.zh-CN.md](README.zh-CN.md#管线优化计划todo).
+
 ## License
 
 **AGPL-3.0** — [LICENSE](LICENSE). PsychoPy is separate — [NOTICE](NOTICE).

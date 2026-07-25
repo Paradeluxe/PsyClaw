@@ -1,5 +1,11 @@
 # psyclaw（Hermes 技能）
 
+> [!IMPORTANT]
+> **旧分支 `master`（仅 skill 的历史快照）。**  
+> 现行产品在 **`main` monorepo**：  
+> **[Paradeluxe/psyclaw](https://github.com/Paradeluxe/psyclaw)** — `skills/psyclaw/` + `webui/`。  
+> 请 clone / 使用 **`main`**，不要用 `master`。GitHub 默认分支已是 `main`。
+
 [English](README.md) · [中文](README.zh-CN.md)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)

@@ -1,5 +1,11 @@
 # psyclaw (Hermes skill)
 
+> [!IMPORTANT]
+> **Legacy branch `master` (skill-only snapshot).**  
+> Current product is the **monorepo on `main`**:  
+> **[Paradeluxe/psyclaw](https://github.com/Paradeluxe/psyclaw)** — `skills/psyclaw/` + `webui/`.  
+> Clone / pull **`main`**, not `master`. Default branch on GitHub is already `main`.
+
 [English](README.md) · [中文](README.zh-CN.md)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)

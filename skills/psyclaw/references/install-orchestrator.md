@@ -103,7 +103,9 @@ Follow **`webui/docs/INSTALL.md` § Update** (canonical):
 3. `cd webui` → activate venv → `pip install -r requirements.txt` (pull 后例行一次).
 4. **PsychoPy** — **仅当** `webui/docs/INSTALL.md` / changelog / optional req 写明要升；否则 **不动**.
 5. Start again: `cd webui && python start.py` or `python start.py --restart`.
-6. If agent CLI needs skill re-sync (e.g. Hermes `hermes skills update psyclaw`), do it now — `git pull` already updated the source in `skills/psyclaw/`; the CLI just needs to re-copy into its skill store.
+6. If agent CLI needs skill re-sync after `git pull`, copy/update
+   `skills/psyclaw/` into that CLI's skill store (product-specific; see
+   **Skill installation** below). Source of truth is always the monorepo.
 
 ### Rules
 
@@ -115,21 +117,37 @@ Follow **`webui/docs/INSTALL.md` § Update** (canonical):
 
 ## Skill installation (cross-CLI)
 
-The skill lives at `skills/psyclaw/` inside the monorepo. Any CLI that
-follows the `skills/<name>/SKILL.md` convention can discover it.
+Package shape follows the **Agent Skills open standard**
+([agentskills.io/specification](https://agentskills.io/specification)):
 
-| CLI | Install command |
-|-----|----------------|
-| Hermes | `hermes install Paradeluxe/psyclaw/skills/psyclaw` |
-| Claude Code | Copy `skills/psyclaw/` → `.claude/skills/psyclaw/` |
-| Codex | Copy `skills/psyclaw/` → agent skill dir |
-| Any | Point your agent at `Paradeluxe/psyclaw/skills/psyclaw` |
+```text
+psyclaw/                 ← skill root (folder name = name)
+├── SKILL.md             ← required: name + description + instructions
+├── scripts/             ← optional executables
+└── references/          ← optional progressive-disclosure docs
+```
 
-Short name `psyclaw` works when the CLI's resolver finds exactly one skill
-named `psyclaw`. Full path: `Paradeluxe/psyclaw/skills/psyclaw`.
+Required frontmatter fields only: `name`, `description`. Extra keys
+(`version`, `license`, `metadata`, …) are optional; compliant agents ignore
+keys they do not understand.
 
-Maintainers edit `skills/psyclaw/` in the monorepo; end users install
-via their agent's skill installer.
+Source of truth in the monorepo: `skills/psyclaw/`. Copy or install that
+folder into whatever skill store the agent uses.
+
+| CLI / product | Typical install |
+|---------------|-----------------|
+| Any (spec) | Place folder so the agent discovers `…/psyclaw/SKILL.md` |
+| Claude Code | `skills/psyclaw/` → `.claude/skills/psyclaw/` (or project skills dir) |
+| Codex / Cursor / VS Code Copilot | Agent skill directory for that product (same folder layout) |
+| OpenCode | e.g. `~/.config/opencode/skills/psyclaw` |
+| Hermes | `hermes install Paradeluxe/psyclaw/skills/psyclaw` (or copy into its skill store) |
+| Manual | Point the agent at `Paradeluxe/psyclaw/skills/psyclaw` or a local clone |
+
+Short name `psyclaw` works when the resolver finds exactly one skill with
+`name: psyclaw`. Full monorepo path: `Paradeluxe/psyclaw/skills/psyclaw`.
+
+Maintainers edit `skills/psyclaw/` in the monorepo; end users sync into
+**their** agent's skill store after `git pull`.
 
 ## One-shot scripts (entry)
 

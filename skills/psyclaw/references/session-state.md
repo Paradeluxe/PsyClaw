@@ -18,6 +18,7 @@ Never write under the skill install tree (`…/skills/psyclaw/`).
 {
   "version": 1,
   "state": "clarify",
+  "lang": null,
   "lit": "off",
   "lit_path": null,
   "gaps": ["Random", "Trial"],
@@ -33,6 +34,7 @@ Never write under the skill install tree (`…/skills/psyclaw/`).
 | Field | Values / meaning |
 |-------|------------------|
 | `state` | `hear` \| `lit` \| `clarify` \| `write` \| `validate` \| `ask_run` \| `handoff` \| `done` |
+| `lang` | `null` until first substantive user msg → then BCP-47-ish tag (`zh` / `en` / …). Chat + operator-facing text follow this; do not reset because docs are EN |
 | `lit` | `off` \| `pending` \| `landed` \| `waived` |
 | `lit_path` | local Method/PDF path under `refs/` when landed; else `null` |
 | `gaps` | checklist codes still open: `Design` `IV` `DV` `Control` `Random` `Practice` `Script` `Response` `Trial` `OutPath` |

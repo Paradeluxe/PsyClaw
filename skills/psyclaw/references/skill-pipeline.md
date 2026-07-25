@@ -39,11 +39,12 @@ INPUT (NL | PDF/Method | existing folder)
 2. **Lit-first** (if lit intent) — land article/Method before design Qs; `lit=pending`→`landed`/`waived`  
 3. **Clarify** — norms coach; paper-anchored if lit landed; shrink `gaps`  
 4. **Write** folder + `<folderName>.psyclaw` at OutPath — new files: start from `marker-stub.psyclaw`; move session file into project if needed  
-5. **Validate** — `marker-validate.md` hard checks 1–7 (optional compile if webui up) → marker ready  
+5. **Validate** — `python scripts/validate_marker.py <marker>` hard checks 1–7 (optional `--compile` if webui up) → marker ready  
 6. **Ask run** only if session `ask_run` is still `null`; then set `yes`/`no`  
-7. **Handoff** if yes → `run-prep.md` checklist → webui (`api-notes.md` if calling) → `finished` + CSV → `state=done`; failures → `failure-playbooks.md`  
+7. **Handoff** if yes → `run-prep.md` checklist → webui (`api-notes.md` if calling) → if agent validates: **Autopilot ×3**, each finished + full pack in project `data/` (or user formal runs) → `state=done`; failures → `failure-playbooks.md`  
 
-Write success = step 5. Lab success = step 7. Multi-subject = sequential runs. No half-run mode.  
+Write success = step 5 (marker validates). Lab success = step 7 (runs finish + project data pack; agent smoke ×3). Multi-subject = sequential runs. No half-run mode.  
+When reporting to the user, say the concrete action (writing marker / finishing a run / files in `data/`), not stage codes.  
 **Resume:** if session file exists, continue from its `state` — do not restart clarify from zero.
 
 ## Lit-first gate
@@ -152,5 +153,7 @@ Prefer OA (author MS, OSF, PMC) before giving up. Host search before browser. No
 
 ## Language / explain
 
-- Match user's first substantive message (chat + marker-facing text).  
+- **Session language** = user's first substantive message (task text + pasted on-screen copy; skip bare hi/ok). Lock for the rest of agent↔user chat unless they clearly switch.
+- SKILL.md / references stay EN for agents; **never** let that pull user-facing replies into EN when the user started in another language.
+- Index `description` is EN on purpose (model skill picker) — unrelated to chat language.
 - Short lists + concrete paths when stuck; no multi-path architecture dumps in chat.

@@ -55,7 +55,7 @@
           "name": "resp",
           "start": 0.5,
           "duration": 2.0,
-          "params": { "keys": "left,right", "force_end": true, "store_correct": true }
+          "params": { "keys": "left,right", "force_end": true}
         }
       ]
     },

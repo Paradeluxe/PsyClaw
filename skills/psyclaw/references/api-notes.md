@@ -28,11 +28,15 @@ PsychoPyProcess
 
 ## Success checks
 
-| Check | Pass means |
+| Stage | Pass means |
 |-------|------------|
-| **Marker ready** | compiler emits parseable Python with `Window` |
+| **Design ready** | `scripts/validate_marker.py` exit 0; optional `--compile` → PsychoPy Python that opens a `Window` |
 | **Run finished** | `/api/runs` → `finished` |
-| **Data on disk** | CSV under **`<project_path>/data/`** |
+| **Data in project** | under **`<project_path>/data/`**: trial CSV **+** `{stem}_summary.json` **+** `{stem}_by_condition.csv` **+** `{stem}_metrics_long.csv` |
+
+**Agent lab smoke:** Autopilot **×3** (same design, `project_path` set). Each run must finish and drop the full four-file pack. One green Autopilot ≠ smoke done.
+
+When talking to the user, say the stage in plain language (writing the marker / finishing a run / files in project `data/`), not internal codes.
 
 ## Run API (minimal)
 
@@ -52,8 +56,9 @@ PsychoPyProcess
 ```
 
 - Pilot: `participant_id: "P_pilot"` (no production ID burn)
+- Autopilot smoke: headless + auto-keys; agent default **3 sequential** Autopilot runs (each finished + full data pack)
 - Formal: sequential IDs from `participants.json`
-- Omit `project_path` → internal `runs/` only → **fails data-on-disk**
+- Omit `project_path` → internal `runs/` only → **fails “data in project”**
 
 ## CSV minimum
 

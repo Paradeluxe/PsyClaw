@@ -41,12 +41,12 @@ One standard reply pattern each: **what happened → what we need → next step*
 3. Re-validate; optional recompile  
 4. **Do not** claim marker ready or start formal subjects
 
-## 5. Run finished but no project CSV
+## 5. Run finished but project data pack incomplete
 
-**Say:**  
-「跑是结束了，但项目 `data/` 下没有镜像 CSV（多半缺 project_path）。」
+**Say (session language), e.g. ZH:**  
+「这次跑是结束了，但项目 `data/` 里没有齐：需要试次 CSV，加上 summary、by_condition、metrics_long。多半是没指项目路径，或结果没拷进项目文件夹。」
 
-**Next:** re-run with `project_path` = project dir; confirm files under `<project>/data/`. Internal `runs/` only ≠ lab success.
+**Next:** re-run with `project_path` = project dir; confirm all four files under `<project>/data/`. Files only under internal `runs/` do not count as delivered. Agent smoke still needs Autopilot ×3, each with a full pack.
 
 ## 6. Session file missing / corrupt
 

@@ -37,10 +37,18 @@ Skill-alone success = hard checks 1–7. Lab success still needs run `finished` 
 ## Agent procedure
 
 1. Write/edit marker (start from `marker-stub.psyclaw` if new).  
-2. Run hard checks 1–7 (read file; do not skip).  
-3. If webui available and user will run soon → try C1.  
-4. On hard fail → fix, re-validate.  
-5. On all hard pass → **marker ready** → ask 要跑被试吗 (unless already answered).
+2. **Machine check (required):** from skill root or any cwd:
+   ```bash
+   python scripts/validate_marker.py <projectDir>/<folderName>.psyclaw
+   # or: python scripts/validate_marker.py <projectDir>
+   # optional C1:  python scripts/validate_marker.py <path> --compile
+   # CI/agent:      python scripts/validate_marker.py <path> --json
+   ```
+   Script lives at `scripts/validate_marker.py` inside the skill package. Exit `0` = hard pass; `1` = hard fail; `2` = path/IO. Soft warns print but do not fail exit.  
+3. Do **not** claim validate OK without exit 0 (or equivalent `--json` `"ok": true`).  
+4. If webui up and user will run soon → add `--compile` (C1).  
+5. On hard fail → fix, re-run script.  
+6. On all hard pass → **marker ready** → ask run-subjects in **session language** (unless already answered).
 
 ## Recap line (before ask-run)
 

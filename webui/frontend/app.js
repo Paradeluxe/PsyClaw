@@ -560,7 +560,8 @@
       var summaryEl = document.getElementById('sys-summary');
       var reasonEl = document.getElementById('sys-gate-reason');
       var metaInline = document.getElementById('sys-meta-inline');
-      // Single-line gate: chip only. Reason → title tooltip (no stacked second line).
+      var gateWrap = document.getElementById('sys-gate');
+      // Chip + visible reason (reason also on chip title for hover).
       if (summaryEl) {
         if (!gate || gate.checking) {
           summaryEl.textContent = t('sys.checking');
@@ -573,10 +574,23 @@
         }
       }
       if (reasonEl) {
-        // Keep node for a11y/legacy; never render a second visual line.
-        reasonEl.textContent = '';
-        reasonEl.title = '';
-        reasonEl.hidden = true;
+        if (!gate || gate.checking) {
+          reasonEl.textContent = t('sys.probing');
+          reasonEl.title = t('sys.probing');
+          reasonEl.hidden = false;
+          reasonEl.className = 'sys-gate-reason muted is-checking';
+        } else {
+          var why = (gate.reason || '').trim();
+          reasonEl.textContent = why || '';
+          reasonEl.title = why || '';
+          reasonEl.hidden = !why;
+          reasonEl.className = 'sys-gate-reason muted status-' + (gate.css || 'idle');
+        }
+      }
+      if (gateWrap) {
+        var lvl = (gate && gate.level) || (gate && gate.checking ? 'checking' : '');
+        gateWrap.dataset.level = lvl || '';
+        gateWrap.dataset.css = (gate && gate.css) || (gate && gate.checking ? 'idle' : '');
       }
       if (metaInline && metaText != null) metaInline.textContent = metaText;
     }
@@ -752,7 +766,25 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
         var psyText = psy.version
           ? ('v' + psy.version)
           : ((cImp && cImp.detail) || '');
+        if (!psyText && cImp && cImp.status === 'fail') {
+          psyText = t('sys.gateReasonImport');
+        } else if (!psyText && cPy && cPy.status === 'fail') {
+          psyText = t('sys.gateReasonPython');
+        }
         var psyTitle = [psyText, psyPath || (cPy && cPy.detail) || ''].filter(Boolean).join(' \u00b7 ');
+        var gfxRaw = cGfx ? String(cGfx.detail || cGfx.value || '').trim() : '';
+        var gfxEmpty = !gfxRaw || /^n\/?a$/i.test(gfxRaw) || gfxRaw === '—';
+        var gfxText = gfxEmpty ? t('sys.gfxNa') : gfxRaw;
+        var gfxSt = cGfx ? cGfx.status : 'info';
+        if (gfxEmpty && (!cGfx || cGfx.status === 'pass' || cGfx.status === 'info')) {
+          gfxSt = 'info';
+        }
+        var gfxTitle = gfxEmpty
+          ? t('sys.gfxNaHint')
+          : (cGfx && cGfx.detail ? String(cGfx.detail) : gfxText);
+        var runText = cRun ? String(cRun.detail || cRun.value || '').trim() : '';
+        var runMock = !!(facts && facts.force_mock) || /mock/i.test(runText);
+        if (runMock && !runText) runText = t('sys.gateReasonMock');
         var engRows =
           _infoRow(
             t('sys.psychopy'),
@@ -762,14 +794,15 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
           ) +
           _infoRow(
             t('sys.graphics'),
-            cGfx ? _val(cGfx.status, cGfx.detail || '') : '\u2014',
+            cGfx ? _val(gfxSt, gfxText) : _val('info', t('sys.gfxNa')),
             false,
-            cGfx && cGfx.detail
+            gfxTitle
           ) +
           _infoRow(
             t('sys.runner'),
-            cRun ? _val(cRun.status, cRun.detail || '') : '\u2014',
-            false
+            cRun ? _val(cRun.status, runText || cRun.detail || '') : '\u2014',
+            false,
+            runMock ? t('sys.gateReasonMock') : (cRun && cRun.detail)
           );
 
     panels.innerHTML =
@@ -1949,12 +1982,28 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                                                     }
                                                   }
                                                   if (!used.length) {
+                                                    var emptyHint = !projectPath()
+                                                      ? t('run.rosterNeedProject')
+                                                      : t('run.rosterEmptyHint');
                                                     rosterBody.innerHTML =
                                                       '<tr class="run-roster-empty"><td colspan="9">' +
+                                                      '<div class="run-roster-empty-inner">' +
+                                                      '<span class="run-roster-empty-title">' +
                                                       escHtml(t('run.rosterEmpty')) +
-                                                      '</td></tr>';
+                                                      '</span>' +
+                                                      '<span class="run-roster-empty-hint muted">' +
+                                                      escHtml(emptyHint) +
+                                                      '</span></div></td></tr>';
+                                                    var wrap = document.querySelector('.run-roster-wrap');
+                                                    if (wrap) wrap.classList.add('is-empty');
+                                                    var card = document.querySelector('.run-roster-card');
+                                                    if (card) card.classList.add('is-empty');
                                                     return;
                                                   }
+                                                  var wrapFull = document.querySelector('.run-roster-wrap');
+                                                  if (wrapFull) wrapFull.classList.remove('is-empty');
+                                                  var cardFull = document.querySelector('.run-roster-card');
+                                                  if (cardFull) cardFull.classList.remove('is-empty');
                                                   rosterBody.innerHTML = used.map(function (e) {
                                                     var when = String(e.at || e.date || '—').replace('T', ' ');
                                                     var pid = String(e.participant_id || '').trim();
@@ -2214,6 +2263,18 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
               setParticipantHint(t('run.nextParticipantDone', { id: (elPart && elPart.value) || '' }), false);
             }
 
+            function setInstrumentEmpty(isEmpty) {
+        var card = document.getElementById('pilot-instrument-card');
+        var list = document.getElementById('pilot-instrument-list');
+        var emptyEl = document.getElementById('instr-empty');
+        if (card) card.classList.toggle('is-empty', !!isEmpty);
+        if (list) list.hidden = !!isEmpty;
+        if (emptyEl) {
+          emptyEl.hidden = !isEmpty;
+          if (isEmpty) emptyEl.textContent = t('run.instrEmpty');
+        }
+      }
+
             function renderInstrument(instr, meta) {
         meta = meta || {};
         var st = document.getElementById('instr-status');
@@ -2242,9 +2303,14 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
         var runEl = document.getElementById('instr-run');
         var notes = document.getElementById('instr-notes');
         if (!instr) {
-          if (st) st.textContent = t('run.noPilot');
+          setInstrumentEmpty(true);
+          if (st) {
+            st.textContent = t('run.noPilot');
+            st.className = '';
+          }
           return;
         }
+        setInstrumentEmpty(false);
         var sess = (instr.session && typeof instr.session === 'object')
           ? instr.session
           : ((meta.session && typeof meta.session === 'object') ? meta.session : {});

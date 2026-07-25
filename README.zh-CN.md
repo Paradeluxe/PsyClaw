@@ -221,10 +221,10 @@ python skills/psyclaw/scripts/doctor.py
 
 #### P2 — webui 产品抛光
 
-- [ ] **System 状态表达** — PsychoPy 警告 / mock runner / `n/a` graphics 要有可见原因或详情入口；`可 Pilot` 语义与色一致
-- [ ] **长设备名截断** — I/O 扬声器等：title 悬停完整名或换行
-- [ ] **Display 黑预览空洞感** — 边界/棋盘/「黑色输出」说明（勿为等高硬改音频卡）
-- [ ] **Run 空态** — roster 0 行时更轻；Instrument 全 `—` 时分组或折叠
+- [x] **System 状态表达** — gate 旁可见原因；mock / graphics n/a / PsychoPy；黄灯文案改为「仅 Pilot」
+- [x] **长设备名截断** — 设备下拉 `title` 悬停全名 + ellipsis
+- [x] **Display 黑预览空洞感** — 空设计时棋盘底 +「黑色输出预览」提示（未改音频卡高度）
+- [x] **Run 空态** — roster 空表说明；Instrument 未跑时整块空态（非一排 `—`）
 - [ ] **前端大拆模块** — `app.js` / `builder.js` 分文件（另开任务，勿顺手大改）
 
 #### P3 — 本地 vault（无 remote）
@@ -237,7 +237,7 @@ python skills/psyclaw/scripts/doctor.py
 1. ~~私有 webui 仓归档文案 + master banner~~  
 2. ~~文档路径统一 monorepo~~  
 3. ~~install-all 实机一次装通~~  
-4. System/Run 状态与空态抛光  
+4. ~~System/Run 状态与空态抛光~~  
 5. 前端拆模块（独立 PR）  
 6. vault commit（仅本地）
 

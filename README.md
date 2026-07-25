@@ -188,10 +188,10 @@ Trunk stays:
 
 #### P2 — webui polish
 
-- [ ] System status explainer (PsychoPy warn / mock / n/a graphics); unify `可 Pilot` semantics
-- [ ] long device-name truncation (title/hover)
-- [ ] Display black-preview emptiness (border/checker/label) — do not force audio-card height match
-- [ ] Run empty states (roster 0 / Instrument all —)
+- [x] System status explainer (visible gate reason; mock / gfx n/a / PsychoPy); `仅 Pilot` + warn color
+- [x] long device-name truncation (select `title` + ellipsis)
+- [x] Display black-preview emptiness (checker when empty + “black output” hint)
+- [x] Run empty states (roster hint; Instrument empty card until first run)
 - [ ] split large frontend (`app.js` / `builder.js`) — separate task
 
 #### P3 — local vault (no remote)
@@ -204,7 +204,7 @@ Trunk stays:
 1. ~~private webui archive note + master banner~~  
 2. ~~monorepo path docs~~  
 3. ~~install-all smoke~~  
-4. System/Run polish  
+4. ~~System/Run polish~~  
 5. frontend split (own PR)  
 6. vault local commit  
 

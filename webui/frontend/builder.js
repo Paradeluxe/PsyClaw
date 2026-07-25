@@ -1112,6 +1112,7 @@
               o0.value = '';
               o0.textContent = autoOptLabel || (typeof t === 'function' ? t('builder.ioDeviceAuto') : 'System default');
               if (o0.textContent === 'builder.ioDeviceAuto') o0.textContent = 'System default';
+              o0.title = o0.textContent;
               sel.appendChild(o0);
               var seen = {};
               (items || []).forEach(function (it) {
@@ -1120,7 +1121,9 @@
                 seen[val] = true;
                 var o = document.createElement('option');
                 o.value = val;
-                o.textContent = _devLabel(it) || val;
+                var lab = _devLabel(it) || val;
+                o.textContent = lab;
+                o.title = lab; // full name on hover (option list + selected)
                 sel.appendChild(o);
               });
               // keep previous selection if still present; else keep stored value as orphan option
@@ -1132,12 +1135,24 @@
                 if (!found) {
                   var ox = document.createElement('option');
                   ox.value = prev;
-                  ox.textContent = prev + ' (saved)';
+                  var oxLab = prev + ' (saved)';
+                  ox.textContent = oxLab;
+                  ox.title = oxLab;
                   sel.appendChild(ox);
                 }
                 sel.value = prev;
               } else {
                 sel.value = '';
+              }
+              // Closed select shows truncated label; title = full selected text
+              var cur = sel.options[sel.selectedIndex];
+              sel.title = cur ? String(cur.title || cur.textContent || '') : '';
+              if (!sel._titleSyncWired) {
+                sel._titleSyncWired = true;
+                sel.addEventListener('change', function () {
+                  var c = sel.options[sel.selectedIndex];
+                  sel.title = c ? String(c.title || c.textContent || '') : '';
+                });
               }
             }
 
@@ -1430,11 +1445,28 @@
             '  inside host ' + hostW + '\u00d7' + hostH + ' \u00b7 ' + formatAspect(hostW, hostH))
           : '';
       }
+      var hintEl = document.getElementById('disp-preview-hint');
+      if (hintEl) {
+        var hint = (typeof t === 'function' ? t('builder.previewBlackHint') : '') ||
+          'Black output preview (participant window)';
+        if (hint === 'builder.previewBlackHint') hint = 'Black output preview (participant window)';
+        hintEl.textContent = hint;
+        hintEl.hidden = false;
+      }
+      if (inner) {
+        inner.classList.toggle('is-empty-design', !(w && h));
+        if (!(w && h)) {
+          // Soft checker so pure black does not look like a broken panel
+          inner.style.background = '';
+          inner.style.color = '';
+        }
+      }
+      if (hostEl) hostEl.classList.toggle('is-empty-design', !(w && h));
       if (fsPill) fsPill.hidden = !fullscreen;
       if (stage) {
               stage.title = (w && h)
                 ? ('Host ' + hostW + '\u00d7' + hostH + ' \u00b7 design ' + w + '\u00d7' + h)
-                : '';
+                : ((typeof t === 'function' ? t('builder.previewBlackHint') : '') || 'Black output preview');
               stage.style.cursor = 'default';
             }
     }

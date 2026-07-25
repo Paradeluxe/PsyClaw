@@ -1253,18 +1253,40 @@ body.has-project .global-lang-switch {
   justify-content: flex-end;
   min-width: 0;
 }
-/* Single-line gate: chip only (reason = chip title). No stacked second line. */
+/* Gate: chip + visible reason (why Pilot-only / blocked / ready). */
 .sys-gate {
   display: flex;
   flex-direction: row;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px 10px;
+  min-width: 0;
+  max-width: min(420px, 52vw);
+}
+.sys-gate-reason {
+  display: inline-block;
   min-width: 0;
   max-width: min(280px, 40vw);
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
-.sys-gate-reason,
-.sys-gate-reason:empty {
+.sys-gate-reason:empty,
+.sys-gate-reason[hidden] {
   display: none !important;
+}
+.sys-gate-reason.status-warn {
+  color: var(--warn);
+}
+.sys-gate-reason.status-fail {
+  color: var(--red);
+}
+.sys-gate-reason.status-pass {
+  color: var(--ok);
 }
 .sys-summary {
   font-family: var(--mono);
@@ -1278,6 +1300,7 @@ body.has-project .global-lang-switch {
   background: var(--surface);
   color: var(--text-dim);
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 .sys-summary.is-checking {
   color: var(--text-dim);
@@ -2017,13 +2040,32 @@ body.has-project .global-lang-switch {
   height: 100%;
   transform: translate(-50%, -50%);
   box-sizing: border-box;
-  background: #1a0a0b;
+  /* Solid black = intended participant output; thin red ring = design window */
+  background: #0a0a0a;
   border: 1px solid rgba(232, 33, 39, 0.55);
   border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+/* Empty / no design size: soft checker so it does not look “broken black panel” */
+.sys-display-preview-window.is-empty-design {
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%),
+    #121212;
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  border-color: rgba(200, 200, 200, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.sys-display-preview-host.is-empty-design {
+  border-style: dashed;
+  border-color: rgba(200, 200, 200, 0.28);
 }
 /* design aspect == host: keep RED window ring; drop host bezel so no double frame */
 .sys-display-preview-host:has(.sys-display-preview-window.is-match) {
@@ -2052,6 +2094,14 @@ body.has-project .global-lang-switch {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.sys-display-preview-hint {
+  flex: 1 1 100%;
+  margin: 2px 0 0;
+  font-size: var(--fs-2xs);
+  line-height: 1.35;
+  color: var(--text-ghost);
+  letter-spacing: 0.01em;
 }
 .sys-display-preview-meta {
   display: flex;
@@ -2159,6 +2209,15 @@ body.has-project .global-lang-switch {
   max-width: 100%;
   box-sizing: border-box;
   line-height: 34px;
+  /* Long device names: keep control width; full name on title hover */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sys-io-field .sys-setting-ctrl {
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 100%;
 }
 .builder-display-select-full {
   width: 100%;
@@ -2407,7 +2466,11 @@ body.has-project .global-lang-switch {
   font-size: var(--fs-sm);
   line-height: 1.45;
   color: var(--text-dim);
-  word-break: break-word;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sys-io-status-sub {
   font-size: var(--fs-xs);
@@ -5018,7 +5081,45 @@ flex: 1 1 auto;
 .run-roster-empty td {
   color: var(--text-ghost);
   text-align: center;
-  padding: 18px 10px;
+  padding: 28px 16px;
+  border: 0;
+}
+.run-roster-empty-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 28em;
+  margin: 0 auto;
+}
+.run-roster-empty-title {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.run-roster-empty-hint {
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+.run-roster-card.is-empty .run-roster-table thead {
+  opacity: 0.45;
+}
+.run-roster-wrap.is-empty {
+  border-style: dashed;
+}
+.run-instr-empty {
+  margin: 4px 0 8px;
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  padding: 14px 12px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+}
+.run-instrument-panel.is-empty .run-instr-empty {
+  display: block;
+}
+.run-instrument-panel:not(.is-empty) .run-instr-empty {
+  display: none;
 }
 .run-roster-lead {
   margin: 0 0 10px;

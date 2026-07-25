@@ -115,6 +115,7 @@
                             <strong class="sys-display-preview-size" id="disp-preview-size">—</strong>
                             <span class="sys-display-preview-ratio" id="disp-ratio-label">—</span>
                             <span class="sys-display-preview-fs" id="disp-preview-fs" hidden data-i18n="builder.fullscreen">Fullscreen</span>
+                            <span class="sys-display-preview-hint muted" id="disp-preview-hint" data-i18n="builder.previewBlackHint">Black output preview (participant window)</span>
                           </div>
                         </div>
 
@@ -514,12 +515,13 @@
                         </div>
 
                         <div class="run-grid">
-                          <section class="run-panel run-instrument-panel" aria-label="Last run instrument" id="pilot-instrument-card">
+                          <section class="run-panel run-instrument-panel is-empty" aria-label="Last run instrument" id="pilot-instrument-card">
                             <div class="panel-heading">
                               <span class="eyebrow" data-i18n="run.bench">bench</span>
                               <h3 data-i18n="run.instrument">Instrument</h3>
                             </div>
-                            <dl class="status-list" id="pilot-instrument-list">
+                            <p class="run-instr-empty muted" id="instr-empty" data-i18n="run.instrEmpty">No run yet. After Pilot / Start, FPS and devices show here.</p>
+                            <dl class="status-list" id="pilot-instrument-list" hidden>
                                                           <div><dt data-i18n="run.instrStatus">Status</dt><dd id="instr-status">—</dd></div>
                                                           <div><dt data-i18n="run.instrMode">Mode</dt><dd id="instr-mode">—</dd></div>
                                                           <div><dt data-i18n="run.instrHeadless">Headless</dt><dd id="instr-headless">—</dd></div>

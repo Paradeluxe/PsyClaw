@@ -1270,14 +1270,6 @@
             '  inside host ' + hostW + '\u00d7' + hostH + ' \u00b7 ' + formatAspect(hostW, hostH))
           : '';
       }
-      var hintEl = document.getElementById('disp-preview-hint');
-      if (hintEl) {
-        var hint = (typeof t === 'function' ? t('builder.previewBlackHint') : '') ||
-          'Black output preview (participant window)';
-        if (hint === 'builder.previewBlackHint') hint = 'Black output preview (participant window)';
-        hintEl.textContent = hint;
-        hintEl.hidden = false;
-      }
       if (inner) {
         inner.classList.toggle('is-empty-design', !(w && h));
         if (!(w && h)) {
@@ -1291,7 +1283,7 @@
       if (stage) {
               stage.title = (w && h)
                 ? ('Host ' + hostW + '\u00d7' + hostH + ' \u00b7 design ' + w + '\u00d7' + h)
-                : ((typeof t === 'function' ? t('builder.previewBlackHint') : '') || 'Black output preview');
+                : '';
               stage.style.cursor = 'default';
             }
     }

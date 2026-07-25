@@ -2011,14 +2011,6 @@ button.sys-summary.is-busy {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sys-display-preview-hint {
-  flex: 1 1 100%;
-  margin: 2px 0 0;
-  font-size: var(--fs-2xs);
-  line-height: 1.35;
-  color: var(--text-ghost);
-  letter-spacing: 0.01em;
-}
 .sys-display-preview-meta {
   display: flex;
   flex-wrap: wrap;

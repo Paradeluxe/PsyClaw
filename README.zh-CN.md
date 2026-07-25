@@ -19,13 +19,18 @@
 psyclaw/
 ├── skills/psyclaw/     ← agent 技能（任意遵循 skills/<name>/ 的 CLI）
 ├── webui/              ← 实验室 GUI（Flask：设计 / 开跑 / CSV）
+│   └── frontend/       ← SPA（app 拆 system/run；builder-parts/ 组装为 builder.js）
 ├── LICENSE, NOTICE
 ```
+
+**不在本仓：** 本机可选的 **psyclaw-vault**（论文 / `experiments/` 试跑）是**另一文件夹**，**无 GitHub remote**。  
+**vault = 本地 papers + 实验数据；产品源码只在本 monorepo。**
 
 | 部分 | 作用 | 使用者 |
 |------|------|--------|
 | **Skill**（`skills/psyclaw/`） | 写实验说明书（`<folderName>.psyclaw`） | AI agent / CLI |
 | **WebUI**（`webui/`） | 画流程 / 跑被试 / CSV | 本机主试（可独立用） |
+| **Vault**（可选，仅本机） | 论文 + 实验文件夹，不是产品代码 | 实验室机器 |
 
 - **斜杠命令：** `/psyclaw`（装 skill 后）
 - **GitHub：** https://github.com/Paradeluxe/psyclaw（**不要**再找旧仓 `psyclaw-skill` / 独立 `psyclaw-webui`）
@@ -225,12 +230,12 @@ python skills/psyclaw/scripts/doctor.py
 - [x] **长设备名截断** — 设备下拉 `title` 悬停全名 + ellipsis
 - [x] **Display 黑预览空洞感** — 空设计时棋盘底 +「黑色输出预览」提示（未改音频卡高度）
 - [x] **Run 空态** — roster 空表说明；Instrument 未跑时整块空态（非一排 `—`）
-- [ ] **前端大拆模块** — `app.js` / `builder.js` 分文件（另开任务，勿顺手大改）
+- [x] **前端拆模块** — `app-system.js` / `app-run.js` / `app.js`；builder `builder-parts/` + assemble
 
 #### P3 — 本地 vault（无 remote）
 
-- [ ] **`psyclaw-vault` 收尾 commit** — 旧 pipeline 56 删除 + `experiments/` untracked；确认后 commit（仍无 remote）
-- [ ] **vault 与 monorepo 边界** — 文档一句：vault = 本地 papers/experiments，不是产品仓
+- [x] **`psyclaw-vault` 收尾 commit** — 删旧 pipeline + `experiments/Stroop` smoke（仅本地，无 remote）
+- [x] **vault 与 monorepo 边界** — vault = 本地 papers/experiments，不是产品仓
 
 ### 建议排期
 
@@ -238,8 +243,8 @@ python skills/psyclaw/scripts/doctor.py
 2. ~~文档路径统一 monorepo~~  
 3. ~~install-all 实机一次装通~~  
 4. ~~System/Run 状态与空态抛光~~  
-5. 前端拆模块（独立 PR）  
-6. vault commit（仅本地）
+5. ~~前端拆模块~~  
+6. ~~vault commit（仅本地）~~
 
 ## 许可证
 

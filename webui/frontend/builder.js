@@ -16,7 +16,12 @@
 (function () {
   'use strict';
 
-  function t(key, vars) {
+  /* modular parts live in builder-parts/ for editing; this file is the runtime bundle.
+   * Maintainers: edit builder-parts/*.js then run: python webui/scripts/_split_builder.py --assemble
+   */
+
+  // ---- builder-part-model.js ----
+function t(key, vars) {
     return (window.PsyClawI18n && window.PsyClawI18n.t)
       ? window.PsyClawI18n.t(key, vars)
       : (window.t ? window.t(key, vars) : key);
@@ -173,6 +178,8 @@
         var uid = 0;
         function nextId(prefix) { uid += 1; return prefix + '_' + uid; }
 
+
+  // ---- builder-part-display.js ----
     /** Default window size = selected monitor (or this machine's screen). */
             var hostMonitors = []; // filled by System probe {index,width,height,primary,label}
             var hostRefreshHz = null; // browser-estimated; PsychoPy cannot set OS refresh
@@ -1777,6 +1784,8 @@
                           wireDisplayPreviewZoom();
                         }
 
+
+  // ---- builder-part-ui.js ----
   function renderPalette() {
     var box = document.getElementById('builder-palette');
     if (!box) return;
@@ -3463,6 +3472,8 @@
       }
 
 
+
+  // ---- builder-part-preview.js ----
   // ---- Component stage preview (inspector) ----
   var previewCtl = null; // { stop: fn }
   var previewMode = 'solo'; // 'solo' | 'routine' — persists across remount
@@ -5021,6 +5032,8 @@
     }
 
   // Boot when DOM ready
+
+  // ---- builder-part-boot.js ----
   function boot() {
     if (!document.getElementById('builder-palette')) return;
     resetDefault();
@@ -5133,4 +5146,5 @@
   } else {
     boot();
   }
+
 })();

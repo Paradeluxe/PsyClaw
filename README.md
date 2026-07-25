@@ -19,8 +19,12 @@ This is a **monorepo** — one clone gets both the agent skill and the lab GUI:
 psyclaw/
 ├── skills/psyclaw/     ← agent skill (any AI CLI with skills/<name>/ convention)
 ├── webui/              ← lab GUI (Flask app: design / run / CSV)
+│   └── frontend/       ← SPA (app.js + app-system/run; builder-parts/ → builder.js)
 ├── LICENSE, NOTICE
 ```
+
+**Not in this repo:** a local **psyclaw-vault** (papers / `experiments/` smoke) is a separate machine folder with **no GitHub remote**.  
+Vault = local papers + experiment data; **product source is only this monorepo.**
 
 ## What's here
 
@@ -28,6 +32,7 @@ psyclaw/
 |------|------|-------------|
 | **Skill** (`skills/psyclaw/`) | Write experiment 说明书 (`<folderName>.psyclaw`) | AI agent / CLI |
 | **WebUI** (`webui/`) | Draw / run / CSV — local lab app | Human operator (standalone) |
+| **Vault** (optional, local) | Papers + `experiments/` only — not product code | Lab machine only |
 
 ## Quick start
 
@@ -192,12 +197,12 @@ Trunk stays:
 - [x] long device-name truncation (select `title` + ellipsis)
 - [x] Display black-preview emptiness (checker when empty + “black output” hint)
 - [x] Run empty states (roster hint; Instrument empty card until first run)
-- [ ] split large frontend (`app.js` / `builder.js`) — separate task
+- [x] split frontend: `app-system.js` / `app-run.js` / `app.js`; builder `builder-parts/` + assemble
 
 #### P3 — local vault (no remote)
 
-- [ ] commit vault teardown residue + `experiments/` smoke
-- [ ] one-line boundary: vault = local papers/experiments, not the product repo
+- [x] commit vault teardown + `experiments/Stroop` smoke (local only, no remote)
+- [x] boundary: vault = local papers/experiments, not product monorepo
 
 ### Suggested order
 
@@ -205,8 +210,8 @@ Trunk stays:
 2. ~~monorepo path docs~~  
 3. ~~install-all smoke~~  
 4. ~~System/Run polish~~  
-5. frontend split (own PR)  
-6. vault local commit  
+5. ~~frontend split~~  
+6. ~~vault local commit~~  
 
 Fuller Chinese checklist: [README.zh-CN.md](README.zh-CN.md#管线优化计划todo).
 

@@ -6197,12 +6197,16 @@ body.has-project .workspace .app-main {
   letter-spacing: var(--track-title);
   font-weight: 700;
 }
-/* page lead stays canonical fs-14; mode hint can stay slightly denser */
+/* page lead: one line (zh/en both long); ellipsis if viewport tight */
 #tab-run .panel-heading-row > div > .muted {
   font-size: var(--fs-md);
   letter-spacing: 0.01em;
-  line-height: 1.45;
-  max-width: 480px;
+  line-height: 1.35;
+  max-width: none;
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #tab-run .run-mode-hint {
   font-size: var(--fs-sm);

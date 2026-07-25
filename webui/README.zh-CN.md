@@ -115,17 +115,25 @@ AI 技能写标记；本 UI 跑被试。技能安装 ≠ 本 GUI。
 ```bash
 git clone https://github.com/Paradeluxe/psyclaw.git ~/psyclaw
 cd ~/psyclaw/webui
+# 首次启动会自动建 .venv 并装依赖（需联网一次）：
+python start.py
+# Windows：双击 start.bat
+# → http://127.0.0.1:8876/
+```
+
+也可手动建 venv（与首次自动 bootstrap 等价）：
+
+```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Unix:    source .venv/bin/activate
 pip install -r requirements.txt
-# 可选：PSYCLAW_PSYCHOPY_PYTHON 指向能 import psychopy 的 Python
 python start.py
-# → http://127.0.0.1:8876/
 ```
 
 1. **PsychoPy** 装在**独立**环境（Flask 启动不必装）。
 2. 完整安装 / 更新 / doctor：**`docs/INSTALL.md`**。
+3. **没有 git？** GitHub → Code → Download ZIP，解压到 `~/psyclaw`，再 `webui/start.bat` / `python start.py`。维护者打包：`python webui/scripts/build_dist_zip.py`。
 
 未设置 `PSYCLAW_PSYCHOPY_PYTHON` 时会探测常见路径；正式跑被试建议显式设置。
 

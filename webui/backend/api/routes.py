@@ -10,7 +10,8 @@ Endpoints (all under /api):
   POST /runs                             body={paradigm_id, spec} -> {run_id}
   GET  /runs/<id>                        -> {status, progress, log_tail, data_files}
   POST /runs/<id>/stop                   -> {ok, status}
-  GET  /runs/<id>/data/<file>            -> CSV file stream
+  GET  /runs/<id>/data/<file>            -> file download (attachment)
+  GET  /runs/<id>/data-pack.zip           -> zip of runs/<id>/data/*
 
 Implementation notes
 --------------------
@@ -32,7 +33,11 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from flask import Response, jsonify, request, send_from_directory
+import io
+import mimetypes
+import zipfile
+
+from flask import Response, jsonify, request, send_file, send_from_directory
 
 from . import api_bp
 from paradigms import (
@@ -1115,20 +1120,107 @@ def stop_run(run_id: str) -> Response:
     return jsonify({"ok": True, "status": sm.state})
 
 
+def _safe_data_filename(filename: str) -> bool:
+    if not filename or "/" in filename or "\\" in filename or filename.startswith("."):
+        return False
+    if ".." in filename:
+        return False
+    return True
+
+
+def _run_data_dir(run_id: str) -> Optional[str]:
+    data_dir = os.path.join(RUNS_DIR, run_id, "data")
+    return data_dir if os.path.isdir(data_dir) else None
+
+
+def _download_name_for(run_id: str, filename: str) -> str:
+    """Prefer project-facing CSV basename from instrument.json when available."""
+    if filename == "trials.csv":
+        instr = _read_instrument(os.path.join(RUNS_DIR, run_id))
+        if isinstance(instr, dict):
+            for key in ("csv", "csv_project"):
+                raw = instr.get(key)
+                if not raw:
+                    continue
+                base = os.path.basename(str(raw).replace("\\", "/"))
+                if base.lower().endswith(".csv") and _safe_data_filename(base):
+                    return base
+    return filename
+
+
+def _mime_for_name(name: str) -> str:
+    lower = name.lower()
+    if lower.endswith(".csv"):
+        return "text/csv"
+    if lower.endswith(".json"):
+        return "application/json"
+    guessed, _ = mimetypes.guess_type(name)
+    return guessed or "application/octet-stream"
+
+
+def _pack_download_stem(run_id: str) -> str:
+    instr = _read_instrument(os.path.join(RUNS_DIR, run_id))
+    if isinstance(instr, dict):
+        for key in ("csv", "csv_project"):
+            raw = instr.get(key)
+            if not raw:
+                continue
+            base = os.path.basename(str(raw).replace("\\", "/"))
+            if base.lower().endswith(".csv"):
+                return base[:-4]
+    return run_id
+
+
 @api_bp.route("/runs/<run_id>/data/<path:filename>", methods=["GET"])
 def run_data(run_id: str, filename: str) -> Response:
     # Reject any path-traversal attempts.
-    if "/" in filename or "\\" in filename or filename.startswith("."):
+    if not _safe_data_filename(filename):
         return jsonify({"error": "invalid filename"}), 400
-    data_dir = os.path.join(RUNS_DIR, run_id, "data")
-    if not os.path.isdir(data_dir):
+    data_dir = _run_data_dir(run_id)
+    if not data_dir:
         return jsonify({"error": "no data for this run"}), 404
     target = os.path.join(data_dir, filename)
     if not os.path.isfile(target):
         return jsonify({"error": f"file not found: {filename}"}), 404
+    download_name = _download_name_for(run_id, filename)
     return send_from_directory(
         data_dir,
         filename,
-        mimetype="text/csv",
-        as_attachment=False,
+        mimetype=_mime_for_name(filename),
+        as_attachment=True,
+        download_name=download_name,
+    )
+
+
+@api_bp.route("/runs/<run_id>/data-pack.zip", methods=["GET"])
+def run_data_pack(run_id: str) -> Response:
+    """Zip all files under runs/<id>/data/ for one-click analysis pack download."""
+    data_dir = _run_data_dir(run_id)
+    if not data_dir:
+        return jsonify({"error": "no data for this run"}), 404
+    names = sorted(
+        n
+        for n in os.listdir(data_dir)
+        if os.path.isfile(os.path.join(data_dir, n)) and _safe_data_filename(n)
+    )
+    if not names:
+        return jsonify({"error": "no data files for this run"}), 404
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for name in names:
+            arc = name
+            # Prefer friendly trials name inside the zip when instrument knows it
+            if name == "trials.csv":
+                friendly = _download_name_for(run_id, name)
+                if friendly and friendly != name:
+                    arc = friendly
+            zf.write(os.path.join(data_dir, name), arcname=arc)
+    buf.seek(0)
+    zip_name = f"{_pack_download_stem(run_id)}_data.zip"
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=zip_name,
     )

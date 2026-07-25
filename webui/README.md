@@ -115,17 +115,25 @@ From the monorepo root (recommended):
 ```bash
 git clone https://github.com/Paradeluxe/psyclaw.git ~/psyclaw
 cd ~/psyclaw/webui
+# First launch bootstraps .venv + deps if missing (needs network once):
+python start.py
+# Windows: double-click start.bat
+# → http://127.0.0.1:8876/
+```
+
+Optional manual venv (same result as first-launch bootstrap):
+
+```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Unix:    source .venv/bin/activate
 pip install -r requirements.txt
-# optional: set PSYCLAW_PSYCHOPY_PYTHON to a Python that can import psychopy
 python start.py
-# → http://127.0.0.1:8876/
 ```
 
 1. Install **PsychoPy** in a **separate** environment (not required for Flask boot).
 2. Full install / update / doctor: **`docs/INSTALL.md`**.
+3. **No git?** GitHub → Code → Download ZIP, unzip to `~/psyclaw`, then `webui/start.bat` / `python start.py`. Maintainer source zip: `python webui/scripts/build_dist_zip.py`.
 
 If `PSYCLAW_PSYCHOPY_PYTHON` is unset, the app probes common install locations. Prefer an explicit value when running subjects.
 

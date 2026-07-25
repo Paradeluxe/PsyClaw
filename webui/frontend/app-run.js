@@ -22,6 +22,7 @@
       var startBtn = document.getElementById('start-run-btn');
       var stopBtn = document.getElementById('stop-run-btn');
       var downloadBtn = document.getElementById('download-csv-btn');
+      var downloadPackBtn = document.getElementById('download-pack-btn');
       if (!startBtn) return;
 
       var statusBadge = document.getElementById('run-status-badge');
@@ -1038,6 +1039,7 @@
                 if (autopilotBtn) autopilotBtn.disabled = running;
                 stopBtn.disabled = (!running);
         if (downloadBtn) downloadBtn.disabled = (status !== 'finished');
+        if (downloadPackBtn) downloadPackBtn.disabled = (status !== 'finished');
       }
 
       function tickElapsed() {
@@ -1101,6 +1103,20 @@
                 ' mode=' + (meta.mode || '?'));
             }
             if (d.status === 'finished') {
+                                                  var dataHint = '';
+                                                  if (d.instrument) {
+                                                    var csvFull = d.instrument.csv_project || d.instrument.csv || '';
+                                                    if (csvFull) {
+                                                      var slash = Math.max(csvFull.lastIndexOf('/'), csvFull.lastIndexOf('\\'));
+                                                      var dataDirHint = slash >= 0 ? csvFull.slice(0, slash) : csvFull;
+                                                      dataHint = dataDirHint;
+                                                    }
+                                                  }
+                                                  if (dataHint) {
+                                                    appendLog('SUCCESS', t('run.dataReady', { dir: dataHint }));
+                                                  } else {
+                                                    appendLog('SUCCESS', t('run.dataReadyGeneric'));
+                                                  }
                                                   // production run: auto next free ID; pilot/autopilot: roster only
                                                   if (lastArmMode === 'pilot' || lastArmMode === 'autopilot') {
                                                     refreshParticipantSuggest({ assignNext: false });
@@ -1387,7 +1403,23 @@
       if (downloadBtn) {
               downloadBtn.addEventListener('click', function () {
                 if (!currentRunId) return;
-                window.location.href = '/api/runs/' + currentRunId + '/data/trials.csv';
+                var a = document.createElement('a');
+                a.href = '/api/runs/' + currentRunId + '/data/trials.csv';
+                a.setAttribute('download', '');
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              });
+            }
+            if (downloadPackBtn) {
+              downloadPackBtn.addEventListener('click', function () {
+                if (!currentRunId) return;
+                var a = document.createElement('a');
+                a.href = '/api/runs/' + currentRunId + '/data-pack.zip';
+                a.setAttribute('download', '');
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
               });
             }
 

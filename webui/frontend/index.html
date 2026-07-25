@@ -6,7 +6,7 @@
   <title>psyclaw-webui</title>
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=251">
+    <link rel="stylesheet" href="style.css?v=252">
     </head>
   <body class="no-project">
     <!-- Workspace gate: must open/create a folder before Builder/System/Run -->
@@ -559,9 +559,12 @@
                               <div class="log-line"><time>00:00:00</time><span class="log-tag log-tag-info">INFO</span><span data-i18n="run.logInit">Run monitor initialized.</span></div>
                             </div>
                             <div class="log-footer">
-                              <span class="muted" data-i18n="run.logFooter">Log updates as the run progresses.</span>
-                              <button id="download-csv-btn" class="btn btn-secondary" type="button" disabled>&#8609; <span data-i18n="run.downloadCsv">Download CSV</span></button>
-                            </div>
+                                                          <span class="muted" data-i18n="run.logFooter">Log updates as the run progresses.</span>
+                                                          <div class="log-footer-actions">
+                                                            <button id="download-pack-btn" class="btn btn-secondary" type="button" disabled>&#8609; <span data-i18n="run.downloadPack">Download data pack</span></button>
+                                                            <button id="download-csv-btn" class="btn btn-ghost btn-sm" type="button" disabled><span data-i18n="run.downloadCsv">CSV only</span></button>
+                                                          </div>
+                                                        </div>
                           </section>
                         </div>
                             </section>
@@ -792,10 +795,10 @@
     </footer>
 
     <!-- i18n → builder (parts assembled into builder.js) → app system/run → shell -->
-    <script src="i18n.js?v=260"></script>
-    <script src="builder.js?v=260"></script>
-    <script src="app-system.js?v=260"></script>
-    <script src="app-run.js?v=260"></script>
-    <script src="app.js?v=260"></script>
+    <script src="i18n.js?v=261"></script>
+        <script src="builder.js?v=260"></script>
+        <script src="app-system.js?v=260"></script>
+        <script src="app-run.js?v=261"></script>
+        <script src="app.js?v=260"></script>
   </body>
 </html>

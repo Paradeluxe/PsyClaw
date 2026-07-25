@@ -5,7 +5,8 @@ Usage (from repo root):
   python start.py
   python start.py --no-browser
 
-Prefers repo ``.venv``, starts backend/app.py, opens http://127.0.0.1:8876/
+Prefers repo ``.venv`` (creates + pip install if missing), starts backend/app.py,
+opens http://127.0.0.1:8876/
 
 If the port is already in use:
   - same app (/api/health) → open browser only
@@ -37,12 +38,183 @@ def _venv_python(root: str) -> str | None:
     return cand if os.path.isfile(cand) else None
 
 
-def _resolve_python(root: str) -> tuple[str | None, str]:
-    """Return (python_exe, source). Prefer .venv, then usable interpreters."""
+def _python_version_ok(python_exe: str) -> bool:
+    try:
+        proc = subprocess.run(
+            [
+                python_exe,
+                "-c",
+                "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)",
+            ],
+            capture_output=True,
+            timeout=12,
+        )
+        return proc.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _python_has_flask(python_exe: str) -> bool:
+    try:
+        proc = subprocess.run(
+            [python_exe, "-c", "import flask"],
+            capture_output=True,
+            timeout=12,
+        )
+        return proc.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _host_pythons() -> list[tuple[str, str]]:
+    """Candidate host interpreters for creating a venv (exe, source label)."""
+    out: list[tuple[str, str]] = []
+    if sys.executable and os.path.isfile(sys.executable):
+        out.append((sys.executable, "current"))
+    for name in ("python", "python3"):
+        which = shutil.which(name)
+        if which:
+            out.append((which, f"path:{name}"))
+    if sys.platform == "win32":
+            py_wh = shutil.which("py")
+            if py_wh:
+                # Prefer py -3 as a launcher token list handled specially below
+                out.append((py_wh, "py-launcher"))
+    seen: set[str] = set()
+    uniq: list[tuple[str, str]] = []
+    for exe, src in out:
+        key = os.path.normcase(os.path.abspath(exe)) + "|" + src
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((exe, src))
+    return uniq
+
+
+def _run_host(host: tuple[str, str], args: list[str], **kwargs) -> subprocess.CompletedProcess:
+    exe, src = host
+    if src == "py-launcher":
+        cmd = [exe, "-3", *args]
+    else:
+        cmd = [exe, *args]
+    return subprocess.run(cmd, **kwargs)
+
+
+def _ensure_runtime(root: str) -> tuple[str | None, str]:
+    """Ensure .venv exists with Flask; return (python_exe, source)."""
+    req = os.path.join(root, "requirements.txt")
     venv = _venv_python(root)
-    if venv:
+    if venv and _python_has_flask(venv):
         return venv, "venv"
 
+    if venv and not _python_has_flask(venv):
+        print("psyclaw-webui: .venv missing Flask — installing requirements…")
+        try:
+            subprocess.run(
+                [venv, "-m", "pip", "install", "--upgrade", "pip"],
+                cwd=root,
+                check=False,
+                timeout=120,
+            )
+            proc = subprocess.run(
+                [venv, "-m", "pip", "install", "-r", req],
+                cwd=root,
+                timeout=600,
+            )
+            if proc.returncode == 0 and _python_has_flask(venv):
+                return venv, "venv"
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print(f"psyclaw-webui: pip install failed: {exc}")
+        print("psyclaw-webui: could not install into existing .venv")
+        print("  Try: .venv\\Scripts\\python.exe -m pip install -r requirements.txt")
+        return None, "venv-broken"
+
+    # Create venv
+    print("psyclaw-webui: no .venv — creating (first launch)…")
+    host_ok: tuple[str, str] | None = None
+    for host in _host_pythons():
+        exe, src = host
+        if src == "py-launcher":
+            try:
+                proc = subprocess.run(
+                    [
+                        exe,
+                        "-3",
+                        "-c",
+                        "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)",
+                    ],
+                    capture_output=True,
+                    timeout=12,
+                )
+                if proc.returncode == 0:
+                    host_ok = host
+                    break
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+        elif _python_version_ok(exe):
+            host_ok = host
+            break
+
+    if not host_ok:
+        print("psyclaw-webui: no usable Python 3.10+ found to create .venv.")
+        print("Install Python 3.10+ from python.org and ensure `python` works, then:")
+        print("  python -m venv .venv")
+        if sys.platform == "win32":
+            print("  .venv\\Scripts\\python.exe -m pip install -r requirements.txt")
+        else:
+            print("  .venv/bin/python -m pip install -r requirements.txt")
+        print("See docs/INSTALL.md")
+        return None, "none"
+
+    try:
+        proc = _run_host(host_ok, ["-m", "venv", ".venv"], cwd=root, timeout=120)
+        if proc.returncode != 0:
+            print("psyclaw-webui: python -m venv failed")
+            return None, "venv-create-failed"
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"psyclaw-webui: venv create failed: {exc}")
+        return None, "venv-create-failed"
+
+    venv = _venv_python(root)
+    if not venv:
+        print("psyclaw-webui: .venv python missing after create")
+        return None, "venv-missing"
+
+    print("psyclaw-webui: installing Flask deps (needs network once)…")
+    try:
+        subprocess.run(
+            [venv, "-m", "pip", "install", "--upgrade", "pip"],
+            cwd=root,
+            check=False,
+            timeout=120,
+        )
+        proc = subprocess.run(
+            [venv, "-m", "pip", "install", "-r", req],
+            cwd=root,
+            timeout=600,
+        )
+        if proc.returncode != 0:
+            print("psyclaw-webui: pip install -r requirements.txt failed")
+            return None, "pip-failed"
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"psyclaw-webui: pip install failed: {exc}")
+        return None, "pip-failed"
+
+    if not _python_has_flask(venv):
+        print("psyclaw-webui: Flask still missing after pip install")
+        return None, "flask-missing"
+
+    print("psyclaw-webui: .venv ready")
+    return venv, "venv-bootstrapped"
+
+
+def _resolve_python(root: str) -> tuple[str | None, str]:
+    """Return (python_exe, source). Prefer .venv (bootstrap if needed)."""
+    py, src = _ensure_runtime(root)
+    if py:
+        return py, src
+
+    # Last resort: host with flask already (dev machines)
     candidates: list[tuple[str, str]] = []
     if sys.executable and os.path.isfile(sys.executable):
         candidates.append((sys.executable, "current"))
@@ -60,18 +232,6 @@ def _resolve_python(root: str) -> tuple[str | None, str]:
         if _python_has_flask(exe):
             return exe, src
     return None, "none"
-
-
-def _python_has_flask(python_exe: str) -> bool:
-    try:
-        proc = subprocess.run(
-            [python_exe, "-c", "import flask"],
-            capture_output=True,
-            timeout=12,
-        )
-        return proc.returncode == 0
-    except (OSError, subprocess.TimeoutExpired):
-        return False
 
 
 def _port_open(host: str, port: int) -> bool:
@@ -158,7 +318,6 @@ def _run_stop(root: str) -> int:
     if not os.path.isfile(stop_py):
         print("missing scripts/stop_server.py")
         return 1
-    # Prefer venv python if present so imports stay simple
     py = _venv_python(root) or sys.executable
     try:
         proc = subprocess.run([py, stop_py], cwd=root, timeout=20)
@@ -234,7 +393,6 @@ def main() -> int:
 
     env = os.environ.copy()
     env.setdefault("PSYCLAW_PORT", str(port))
-    # Ensure child can import backend package layout
     env["PYTHONPATH"] = os.path.join(root, "backend") + os.pathsep + env.get("PYTHONPATH", "")
 
     try:

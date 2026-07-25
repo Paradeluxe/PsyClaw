@@ -61,10 +61,18 @@ echo "Installing Flask dependencies..."
 echo "Remembering webui path..."
 "$VENV_PY" scripts/user_config.py remember
 
+echo "Creating desktop shortcut / app entry..."
+"$VENV_PY" scripts/make_desktop_shortcut.py || echo "WARNING: desktop shortcut skipped"
+
 echo ""
 echo "=== Install complete ==="
 echo "Monorepo:  $MONOREPO_DIR"
 echo "WebUI:     $WEBUI_DIR"
 echo "Start:     cd $WEBUI_DIR && python start.py"
+echo "  or:      cd $WEBUI_DIR && ./start.sh"
 echo "URL:       http://127.0.0.1:8876"
 echo "Config:    ~/.psyclaw/config.json  (webui_root)"
+if [ "${PSYCLAW_START:-}" = "1" ]; then
+  echo "PSYCLAW_START=1 — launching…"
+  (cd "$WEBUI_DIR" && "$VENV_PY" start.py) &
+fi

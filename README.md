@@ -49,16 +49,12 @@ cp -r ~/psyclaw/skills/psyclaw ~/.claude/skills/
 
 # 3. Setup webui
 cd ~/psyclaw/webui
-python -m venv .venv
-# Windows:  .venv\Scripts\activate
-# Unix:     source .venv/bin/activate
-pip install -r requirements.txt
-
-# 4. Start webui
+# First start.py / start.bat bootstraps .venv + pip if missing
 python start.py
 # → http://127.0.0.1:8876
+# Optional desktop shortcut:
+# python scripts/make_desktop_shortcut.py
 ```
-
 ## User usage pipeline
 
 ```text

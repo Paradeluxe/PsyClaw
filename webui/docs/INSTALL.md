@@ -124,7 +124,7 @@ python -c "from backend.psychopy_env import describe_resolution; import json; pr
 
 ## 3. Run (standalone launcher)
 
-WebUI is a **standalone lab app** (no agent skill required). After §1 venv is ready:
+WebUI is a **standalone lab app** (no agent skill required).
 
 | OS | Double-click / command |
 |----|------------------------|
@@ -133,17 +133,28 @@ WebUI is a **standalone lab app** (no agent skill required). After §1 venv is r
 | **macOS** | `cd webui && start.command` (first time: right-click → Open, or `chmod +x start.command start.sh`) |
 | **Linux** | `cd webui && ./start.sh` (`chmod +x start.sh` once) |
 
-**Windows:** double-click `start.bat` — uses **only** repo `.venv\Scripts\python.exe` (no `py` launcher).  
+**First launch:** if `.venv` is missing, `start.py` creates it and runs `pip install -r requirements.txt` (needs network once). `start.bat` will use system `python` / `py -3` only to bootstrap, then prefer `.venv`.
+
+**Windows:** double-click `start.bat`.  
 **macOS/Linux:** `start.command` / `start.sh` → `python3 start.py`.  
 Starts server, waits until `/api/health` is up, opens **http://127.0.0.1:8876/**.  
 `--no-browser` skips the browser. Stop with Ctrl+C. On error, Windows console **pauses**.
 
-Desktop shortcut must point at a clone that **already has** `.venv` (run §1 first). Recreate shortcut after install:
+Desktop shortcut (icon = `icon.ico` / `icon.png` at webui root):
 
 ```bash
 cd webui
 python scripts/make_desktop_shortcut.py
 ```
+
+One-shot install also creates the shortcut at the end.
+
+### No git on the lab PC?
+
+1. On a machine with browser: GitHub **Paradeluxe/psyclaw** → **Code → Download ZIP** (or a maintainer-built zip from `python webui/scripts/build_dist_zip.py`).
+2. Unzip to `%USERPROFILE%\psyclaw` (so you have `psyclaw\webui\start.bat`).
+3. Double-click `webui\start.bat` (Python 3.10+ on PATH required).
+4. Optional: `python scripts/make_desktop_shortcut.py` after first successful start.
 
 Equivalent manual start:
 
@@ -172,16 +183,7 @@ cd webui && python scripts/stop_server.py
 python start.py --restart
 ```
 
-**Desktop shortcut (optional):**
-
-```bash
-cd webui
-python scripts/make_desktop_shortcut.py
-```
-
-Uses `assets/icon.ico` (Windows) / `assets/icon.png` (Linux). macOS: drag `start.command` to Desktop; set icon from `assets/icon.png` via Get Info if desired.
-
-Brand assets: `assets/icon.svg` (source), `icon.png`, `icon-512.png`, `icon.ico`. Browser tab uses `frontend/favicon.ico`.
+Brand assets: `icon.svg` (source), `icon.png`, `icon-512.png`, `icon.ico` at **webui root**. Browser tab uses `frontend/favicon.ico`.
 
 ## 4. First project
 
@@ -191,6 +193,12 @@ Brand assets: `assets/icon.svg` (source), `icon.png`, `icon-512.png`, `icon.ico`
 4. **Run** → Pilot (manual) or Autopilot (headless auto-keys for smoke) or Start (formal).
 
 CSV lands in **`<project>/data/`** (and a copy under server `runs/<id>/`).
+
+After a finished run:
+
+- **Open folder** — Explorer/Finder on the project (best for lab)
+- **Download data pack** — zip of run data files (trials + any summary siblings)
+- **CSV only** — single trial table attachment (friendly name when known)
 
 ## 5. Update
 

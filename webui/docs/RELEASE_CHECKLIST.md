@@ -16,6 +16,7 @@ Maintainer checklist when cutting a version tag.
 
 - [ ] Bump version in `pyproject.toml` and `CITATION.cff`
 - [ ] Tag `vX.Y.Z` and note highlights in release notes
+- [ ] Optional: `python webui/scripts/build_dist_zip.py --out dist/psyclaw-src-vX.Y.Z.zip` and attach to GitHub Release (**only with user OK**)
 - [ ] Optional companion: Hermes skill release notes if marker schema changed
 
 ## Never ship

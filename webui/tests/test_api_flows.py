@@ -99,6 +99,20 @@ def test_mock_run_finishes_downloads_and_mirrors_csv(api_client) -> None:
     assert downloaded.status_code == 200
     assert downloaded.data.startswith(b"participant_id,trial,")
     assert (project / "data" / "trials.csv").read_bytes() == downloaded.data
+    cd = downloaded.headers.get("Content-Disposition") or ""
+    assert "attachment" in cd.lower()
+
+    pack = client.get(f"/api/runs/{run_id}/data-pack.zip")
+    assert pack.status_code == 200
+    assert "zip" in (pack.headers.get("Content-Type") or "").lower()
+    pcd = pack.headers.get("Content-Disposition") or ""
+    assert "attachment" in pcd.lower()
+    import io
+    import zipfile
+
+    zf = zipfile.ZipFile(io.BytesIO(pack.data))
+    names = zf.namelist()
+    assert any(n.endswith(".csv") for n in names)
 
 
 def test_stop_run_reaches_stopped_without_csv(api_client) -> None:

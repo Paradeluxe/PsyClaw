@@ -88,15 +88,26 @@ if errorlevel 1 (
   echo WARNING: could not write ~/.psyclaw/config.json webui_root
 )
 
+echo Creating desktop shortcut...
+".venv\Scripts\python.exe" scripts\make_desktop_shortcut.py
+if errorlevel 1 (
+  echo WARNING: desktop shortcut skipped
+)
+
 echo.
 echo === Install complete ===
 echo Monorepo:  %MONOREPO_DIR%
 echo WebUI:     %WEBUI_DIR%
-echo Start:     cd /d "%WEBUI_DIR%" ^& python start.py
+echo Start:     double-click Desktop "PsyClaw WebUI"
 echo   or:      cd /d "%WEBUI_DIR%" ^& start.bat
+echo   or:      cd /d "%WEBUI_DIR%" ^& python start.py
 echo URL:       http://127.0.0.1:8876
 echo Config:    %%USERPROFILE%%\.psyclaw\config.json  ^(webui_root^)
 echo.
+if /i "%PSYCLAW_START%"=="1" (
+  echo PSYCLAW_START=1 — launching webui...
+  start "" "%WEBUI_DIR%\start.bat"
+)
 if /i "%PSYCLAW_NONINTERACTIVE%"=="1" exit /b 0
 pause
 exit /b 0

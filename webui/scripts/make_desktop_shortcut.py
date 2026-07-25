@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Create a desktop shortcut to the cross-platform launcher (best-effort).
 
-Windows: .lnk via PowerShell (icon = assets/icon.ico)
+Windows: .lnk via PowerShell (icon = icon.ico at webui root, assets/ fallback)
 macOS:   .command alias copy instructions / optional .app stub later
 Linux:   ~/.local/share/applications/psyclaw-webui.desktop
 
@@ -19,20 +19,36 @@ def repo_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _first_existing(root: str, *rels: str) -> str:
+    for rel in rels:
+        p = os.path.join(root, rel)
+        if os.path.isfile(p):
+            return p
+    return os.path.join(root, rels[0]) if rels else root
+
+
+def icon_ico(root: str) -> str:
+    return _first_existing(root, "icon.ico", os.path.join("assets", "icon.ico"))
+
+
+def icon_png(root: str) -> str:
+    return _first_existing(root, "icon.png", os.path.join("assets", "icon.png"))
+
+
 def windows_shortcut(root: str) -> str:
     desktop = os.path.join(os.path.expanduser("~"), "Desktop")
     if not os.path.isdir(desktop):
         desktop = os.path.join(os.environ.get("USERPROFILE", ""), "Desktop")
     lnk = os.path.join(desktop, "PsyClaw WebUI.lnk")
     bat = os.path.join(root, "start.bat")
-    ico = os.path.join(root, "assets", "icon.ico")
+    ico = icon_ico(root)
     venv_py = os.path.join(root, ".venv", "Scripts", "python.exe")
     if not os.path.isfile(venv_py):
         print(
-            "WARNING: no .venv in this folder — double-click will fail until you run:\n"
-            "  python -m venv .venv && .venv\\Scripts\\pip install -r requirements.txt"
+            "WARNING: no .venv in this folder — double-click will bootstrap on first start "
+            "if Python 3.10+ is on PATH, or run:\n"
+            "  python -m venv .venv && .venv\\Scripts\\python.exe -m pip install -r requirements.txt"
         )
-    # cmd.exe /k keeps window if bat fails; Target = bat with correct WorkingDirectory
     ps = f"""
 $w = New-Object -ComObject WScript.Shell
 $s = $w.CreateShortcut('{lnk.replace("'", "''")}')
@@ -55,7 +71,7 @@ def linux_desktop(root: str) -> str:
     os.makedirs(apps, exist_ok=True)
     path = os.path.join(apps, "psyclaw-webui.desktop")
     sh = os.path.join(root, "start.sh")
-    icon = os.path.join(root, "assets", "icon.png")
+    icon = icon_png(root)
     body = f"""[Desktop Entry]
 Type=Application
 Name=PsyClaw WebUI
@@ -81,7 +97,7 @@ def macos_note(root: str) -> str:
         pass
     return (
         f"macOS: drag {cmd} to Desktop or Dock. "
-        f"Icon: set Get Info → paste {os.path.join(root, 'assets', 'icon.png')}"
+        f"Icon: set Get Info → paste {icon_png(root)}"
     )
 
 
@@ -104,9 +120,7 @@ def main() -> int:
     else:
         out = linux_desktop(root)
         print(f"Desktop entry: {out}")
-    ico = os.path.join(root, "assets", "icon.ico")
-    png = os.path.join(root, "assets", "icon.png")
-    print(f"icons: {png} | {ico}")
+    print(f"icons: {icon_png(root)} | {icon_ico(root)}")
     return 0
 
 

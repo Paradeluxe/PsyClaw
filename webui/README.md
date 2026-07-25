@@ -1,5 +1,10 @@
 # PsyClaw WebUI
 
+> **Monorepo package.** This folder is `webui/` inside
+> **[Paradeluxe/psyclaw](https://github.com/Paradeluxe/psyclaw)** (`main`).
+> Clone that repo — do not treat the deprecated private `psyclaw-webui` tree as source of truth.
+> Agent skill lives next to this package at `skills/psyclaw/`.
+
 [English](README.md) · [中文](README.zh-CN.md)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
@@ -105,19 +110,24 @@ Palette today: **text, keyboard, image, video, fixation, code** (plus types the 
 
 ## Quick start
 
-1. Install **PsychoPy** (separate environment).
-2. Install server deps and set the PsychoPy interpreter:
+From the monorepo root (recommended):
 
 ```bash
+git clone https://github.com/Paradeluxe/psyclaw.git ~/psyclaw
+cd ~/psyclaw/webui
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Unix:    source .venv/bin/activate
 pip install -r requirements.txt
-export PSYCLAW_PSYCHOPY_PYTHON="/path/to/PsychoPy/python"   # Windows: set PSYCLAW_PSYCHOPY_PYTHON=...
-python backend/app.py
+# optional: set PSYCLAW_PSYCHOPY_PYTHON to a Python that can import psychopy
+python start.py
+# → http://127.0.0.1:8876/
 ```
 
-3. Open **http://127.0.0.1:8876/**  
-   Full install notes: **`docs/INSTALL.md`**.
+1. Install **PsychoPy** in a **separate** environment (not required for Flask boot).
+2. Full install / update / doctor: **`docs/INSTALL.md`**.
 
-If the env var is unset, the app probes common install locations. Prefer an explicit `PSYCLAW_PSYCHOPY_PYTHON`.
+If `PSYCLAW_PSYCHOPY_PYTHON` is unset, the app probes common install locations. Prefer an explicit value when running subjects.
 
 ## Layout
 

@@ -147,7 +147,7 @@ Trunk stays:
 
 - [x] private `Paradeluxe/psyclaw-webui` deprecated banner → monorepo `webui/` (`dfb127f`; not archived)
 - [x] `master` skill-only banner → use `main` monorepo (`7765521`; branch kept)
-- [ ] docs still saying `psyclaw-skill` → `Paradeluxe/psyclaw` + `skills/psyclaw`
+- [x] docs paths → `Paradeluxe/psyclaw` + `skills/psyclaw` + `webui/` (no `psyclaw-skill/` tree)
 - [ ] one-shot install skill+webui (`install-all.bat` / `install-full.sh`) real-machine verify
 
 #### P2 — webui polish
@@ -166,7 +166,7 @@ Trunk stays:
 ### Suggested order
 
 1. ~~private webui archive note + master banner~~  
-2. monorepo path docs  
+2. ~~monorepo path docs~~  
 3. install-all smoke  
 4. System/Run polish  
 5. frontend split (own PR)  

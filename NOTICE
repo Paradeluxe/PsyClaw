@@ -2,7 +2,8 @@
 
 ## License
 
-PsyClaw skill (`/psyclaw`) is licensed under the **GNU Affero General Public
+PsyClaw monorepo (`Paradeluxe/psyclaw` — agent skill at `skills/psyclaw/`
+and lab UI at `webui/`) is licensed under the **GNU Affero General Public
 License v3.0** (AGPL-3.0). See [LICENSE](LICENSE).
 
 Same family as Paradeluxe/Praasper (AGPL-3.0).

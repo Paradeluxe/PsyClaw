@@ -1,5 +1,10 @@
 # PsyClaw WebUI
 
+> **Monorepo 子包。** 本目录是
+> **[Paradeluxe/psyclaw](https://github.com/Paradeluxe/psyclaw)**（`main`）里的 `webui/`。
+> 请 clone 该 monorepo；不要把已弃用的私有仓 `psyclaw-webui` 当真源。
+> Agent 技能在同仓 `skills/psyclaw/`。
+
 [English](README.md) · [中文](README.zh-CN.md)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
@@ -105,19 +110,24 @@ AI 技能写标记；本 UI 跑被试。技能安装 ≠ 本 GUI。
 
 ## 快速开始
 
-1. 安装 **PsychoPy**（独立环境）。
-2. 安装服务端依赖并设置 PsychoPy 解释器：
+从 monorepo 根目录开始（推荐）：
 
 ```bash
+git clone https://github.com/Paradeluxe/psyclaw.git ~/psyclaw
+cd ~/psyclaw/webui
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Unix:    source .venv/bin/activate
 pip install -r requirements.txt
-export PSYCLAW_PSYCHOPY_PYTHON="/path/to/PsychoPy/python"   # Windows: set PSYCLAW_PSYCHOPY_PYTHON=...
-python backend/app.py
+# 可选：PSYCLAW_PSYCHOPY_PYTHON 指向能 import psychopy 的 Python
+python start.py
+# → http://127.0.0.1:8876/
 ```
 
-3. 打开 **http://127.0.0.1:8876/**  
-   完整安装说明：**`docs/INSTALL.md`**。
+1. **PsychoPy** 装在**独立**环境（Flask 启动不必装）。
+2. 完整安装 / 更新 / doctor：**`docs/INSTALL.md`**。
 
-未设置环境变量时，应用会探测常见安装路径。建议显式设置 `PSYCLAW_PSYCHOPY_PYTHON`。
+未设置 `PSYCLAW_PSYCHOPY_PYTHON` 时会探测常见路径；正式跑被试建议显式设置。
 
 ## 目录布局
 

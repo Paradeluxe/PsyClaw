@@ -1,25 +1,38 @@
-# psyclaw（Hermes 技能）
+# psyclaw
 
 [English](README.md) · [中文](README.zh-CN.md)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
-[![Hermes skill](https://img.shields.io/badge/Hermes-%2Fpsyclaw-8B5CF6)](https://github.com/Paradeluxe/psyclaw)
+[![Skill](https://img.shields.io/badge/AI%20skill-psyclaw-8B5CF6)](https://github.com/Paradeluxe/psyclaw)
 [![Marker](https://img.shields.io/badge/marker-.psyclaw-0ea5e9)](https://github.com/Paradeluxe/psyclaw)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/Paradeluxe/psyclaw)
 [![Lab GUI](https://img.shields.io/badge/lab%20GUI-psyclaw--webui-22c55e)](https://github.com/Paradeluxe/psyclaw)
 [![GitHub stars](https://img.shields.io/github/stars/Paradeluxe/psyclaw?style=social)](https://github.com/Paradeluxe/psyclaw)
 
-把自然语言描述（或论文 Method）变成项目文件夹里的 **`<folderName>.psyclaw`**。
+把自然语言描述（或论文 Method）变成项目文件夹里的 **`<folderName>.psyclaw`** — 再跑被试、落 CSV。
 
-**宗旨：拿起来就能用。** 论文/自然语言 → 可跑标记 → webui 跑被试 → `data/` 长表+汇总+指标长表。
+**宗旨：拿起来就能用。** 论文/自然语言 → 可跑标记 → 跑被试 → `data/` 长表 + 汇总 + 条件表 + 指标长表。
 
-- **斜杠命令：** `/psyclaw`
-- **GitHub：** https://github.com/Paradeluxe/psyclaw
-- WebUI 在同仓库 `webui/` 子目录（跑被试 → CSV）。
+这是 **monorepo**：一次 clone 同时拿到 agent 技能与实验室 GUI：
+
+```
+psyclaw/
+├── skills/psyclaw/     ← agent 技能（任意遵循 skills/<name>/ 的 CLI）
+├── webui/              ← 实验室 GUI（Flask：设计 / 开跑 / CSV）
+├── LICENSE, NOTICE
+```
+
+| 部分 | 作用 | 使用者 |
+|------|------|--------|
+| **Skill**（`skills/psyclaw/`） | 写实验说明书（`<folderName>.psyclaw`） | AI agent / CLI |
+| **WebUI**（`webui/`） | 画流程 / 跑被试 / CSV | 本机主试（可独立用） |
+
+- **斜杠命令：** `/psyclaw`（装 skill 后）
+- **GitHub：** https://github.com/Paradeluxe/psyclaw（**不要**再找旧仓 `psyclaw-skill` / 独立 `psyclaw-webui`）
 
 ## 用户使用管线
 
-只有一条主线。安装见下文，与日常使用分开。本节是 **`/psyclaw` 日常怎么用**。
+只有一条主线。安装见下文，与日常使用分开。本节是 **日常怎么用**。
 
 ```text
 输入
@@ -80,38 +93,67 @@ MyExp/
 
 仅技能 = 说明书就绪 + 询问是否开跑。完整实验室成功需要 webui + PsychoPy。
 
-## 安装（不是使用管线）
+## 快速开始
 
 ```bash
-hermes skills install psyclaw -y
-# 始终可用的完整 id：
+# 1. Clone monorepo（真源只有这一仓）
+git clone https://github.com/Paradeluxe/psyclaw.git ~/psyclaw
+
+# 2. 安装 skill（按 CLI 选一条）
+# Hermes:
 hermes install Paradeluxe/psyclaw/skills/psyclaw
+# Claude Code:
+cp -r ~/psyclaw/skills/psyclaw ~/.claude/skills/
+# 任意 CLI：把 agent 指到 ~/psyclaw/skills/psyclaw/
+
+# 3. 准备 webui
+cd ~/psyclaw/webui
+python -m venv .venv
+# Windows:  .venv\Scripts\activate
+# Unix:     source .venv/bin/activate
+pip install -r requirements.txt
+
+# 4. 启动 webui
+python start.py
+# → http://127.0.0.1:8876
 ```
 
-然后在新会话里用 `/psyclaw`。
+## 安装说明（不是使用管线）
 
-| | 会装 | 不会装 |
-|--|------|--------|
-| `hermes skills install …` | 本技能 → `/psyclaw` | webui、Flask 虚拟环境、PsychoPy、browser-skill |
-| 实验室 GUI | 另行安装 [psyclaw-webui](https://github.com/Paradeluxe/psyclaw) | Hermes 智能体 |
-| 相关 | **browser-skill** 可选（第二类：拉 PDF/Method） | 不静默安装 |
+| 机制 | 会装 | 不会装 |
+|------|------|--------|
+| Agent CLI 装 skill | 读 monorepo 的 `skills/psyclaw/` 进 CLI skill 库 | webui 虚拟环境、PsychoPy |
+| WebUI 本机准备 | `webui/` 下 Flask `.venv` + `requirements.txt` | agent skill 文件、PsychoPy |
+| 实验室 GUI | **同仓** `webui/`（不是另一个 GitHub 产品仓） | — |
+| 相关 | **browser-skill** 可选（拉 PDF/Method） | 不静默安装 |
 
-首次使用 / 全装：doctor 查缺 → **征得同意** → 只装缺的。详见 `skills/psyclaw/references/install-orchestrator.md`。
+**不要**再 clone 已弃用的独立仓 `Paradeluxe/psyclaw-webui` 或旧 skill 线当现行版；请用本 monorepo 的 **`main`**。
+
+完整 webui 安装 / PsychoPy / 更新 / doctor：
+- **`webui/docs/INSTALL.md`** — 实验室端规范
+- **`skills/psyclaw/references/install-orchestrator.md`** — agent 侧编排
+
+首次使用 / 全装：doctor 查缺 → **征得同意** → 只装缺的。
 
 ## 仓库布局
 
 ```text
-psyclaw-skill/
-  README.md            # 英文（默认）
-  README.zh-CN.md      # 中文
-  LICENSE
-  NOTICE
-  skills.sh.json
-  skills/
-    psyclaw/
-      SKILL.md
-      scripts/doctor.py
-      references/   # 管线、规范、webui 交接门禁
+psyclaw/                         # Paradeluxe/psyclaw  monorepo
+├── skills/psyclaw/
+│   ├── SKILL.md
+│   ├── scripts/doctor.py
+│   ├── install-full.sh, install-all.bat
+│   └── references/              # 管线、规范、webui 交接门禁
+├── webui/
+│   ├── backend/                 # Flask + 编译器 + runner
+│   ├── frontend/                # SPA（Builder / System / Run）
+│   ├── start.py, start.bat
+│   ├── requirements.txt
+│   ├── docs/INSTALL.md
+│   └── tests/
+├── README.md, README.zh-CN.md
+├── skills.sh.json
+├── LICENSE, NOTICE
 ```
 
 ## 自检
@@ -149,7 +191,7 @@ python skills/psyclaw/scripts/doctor.py
 
 - [x] **私有仓 `Paradeluxe/psyclaw-webui` 归档策略** — 轻方案：README 顶部 deprecated → monorepo `webui/`（`dfb127f`）；未 Archive 仓库
 - [x] **`master` 旧 skill-only 线** — README 顶部 banner：请用 `main` monorepo（`7765521`）；未删分支
-- [ ] **装机路径文档** — SKILL/README 仍可能写 `Paradeluxe/psyclaw-skill`；统一为 `Paradeluxe/psyclaw`（`skills/psyclaw`）
+- [x] **装机路径文档** — 去掉 `psyclaw-skill/` 旧树与「另行安装独立 webui」表述；统一 `Paradeluxe/psyclaw` + `skills/psyclaw` + `webui/`
 - [ ] **一次安装 skill+webui** — `install-all.bat` / `install-full.sh` 实机验收 + 文档入口写清
 
 #### P2 — webui 产品抛光
@@ -168,7 +210,7 @@ python skills/psyclaw/scripts/doctor.py
 ### 建议排期
 
 1. ~~私有 webui 仓归档文案 + master banner~~  
-2. 文档路径统一 monorepo  
+2. ~~文档路径统一 monorepo~~  
 3. install-all 实机一次装通  
 4. System/Run 状态与空态抛光  
 5. 前端拆模块（独立 PR）  

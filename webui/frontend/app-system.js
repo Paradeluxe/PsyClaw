@@ -464,35 +464,39 @@
     return { level: 'run', css: 'pass', label: t('sys.gateRun'), reason: t('sys.gateReasonOk') };
   }
 
+  function summaryNodes() {
+    var btn = document.getElementById('sys-summary');
+    if (!btn) return { btn: null, label: null };
+    var label = btn.querySelector('.sys-summary-label') || btn;
+    return { btn: btn, label: label };
+  }
+
+  function setSummaryBusy(busy) {
+    var n = summaryNodes();
+    if (!n.btn) return;
+    n.btn.disabled = !!busy;
+    n.btn.classList.toggle('is-busy', !!busy);
+  }
+
   function paintGate(gate, metaText) {
-      var summaryEl = document.getElementById('sys-summary');
-      var reasonEl = document.getElementById('sys-gate-reason');
+      var n = summaryNodes();
       var metaInline = document.getElementById('sys-meta-inline');
       var gateWrap = document.getElementById('sys-gate');
-      // Chip + visible reason (reason also on chip title for hover).
-      if (summaryEl) {
+      // Chip only; reason on chip title tooltip (no second line).
+      if (n.btn) {
         if (!gate || gate.checking) {
-          summaryEl.textContent = t('sys.checking');
-          summaryEl.className = 'sys-summary status-idle is-checking';
-          summaryEl.title = t('sys.probing');
+          if (n.label) n.label.textContent = t('sys.checking');
+          n.btn.className = 'sys-summary status-idle is-checking';
+          n.btn.title = t('sys.probing');
+          setSummaryBusy(true);
         } else {
-          summaryEl.textContent = gate.label || '—';
-          summaryEl.className = 'sys-summary status-' + (gate.css || 'idle');
-          summaryEl.title = gate.reason || gate.label || '';
-        }
-      }
-      if (reasonEl) {
-        if (!gate || gate.checking) {
-          reasonEl.textContent = t('sys.probing');
-          reasonEl.title = t('sys.probing');
-          reasonEl.hidden = false;
-          reasonEl.className = 'sys-gate-reason muted is-checking';
-        } else {
-          var why = (gate.reason || '').trim();
-          reasonEl.textContent = why || '';
-          reasonEl.title = why || '';
-          reasonEl.hidden = !why;
-          reasonEl.className = 'sys-gate-reason muted status-' + (gate.css || 'idle');
+          if (n.label) n.label.textContent = gate.label || '—';
+          n.btn.className = 'sys-summary status-' + (gate.css || 'idle');
+          var reason = gate.reason || gate.label || '';
+          n.btn.title = reason
+            ? (reason + ' · ' + t('sys.recheckHint'))
+            : t('sys.recheckHint');
+          setSummaryBusy(false);
         }
       }
       if (gateWrap) {
@@ -933,21 +937,15 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                   async function runSystemChecks() {
     var allEl = document.getElementById('sys-checks-all')
       || document.getElementById('sys-checks-host');
-    var summaryEl = document.getElementById('sys-summary');
     var overallEl = document.getElementById('sys-overall');
     var elapsedEl = document.getElementById('sys-elapsed');
     var checkedEl = document.getElementById('sys-checked-at');
     var metaInline = document.getElementById('sys-meta-inline');
     var reportEl = document.getElementById('sys-report');
-    var rerunBtn = document.getElementById('sys-rerun-btn');
 
     var myGen = ++systemCheckGen;
     paintGate({ checking: true }, '…');
         if (allEl) allEl.innerHTML = '<li class="sys-check sys-check-info"><span class="sys-badge">…</span><div>' + t('sys.probing') + '</div></li>';
-        if (rerunBtn) {
-          rerunBtn.disabled = true;
-          rerunBtn.classList.add('is-busy');
-        }
         // Keep host card visible; always skeleton while probing (no leftover pass pills)
         var devCard = document.getElementById('sys-device-card');
         if (devCard) {
@@ -1148,10 +1146,6 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                             reportEl.textContent = String(e);
                           }
                         }
-                        if (rerunBtn) {
-                          rerunBtn.disabled = false;
-                          rerunBtn.classList.remove('is-busy');
-                        }
                         lastSystemSnapshot.gate = gate;
                         return { overall: overall, counts: counts, gate: gate };
         } catch (eSys) {
@@ -1164,11 +1158,6 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
         } finally {
           // only the latest probe owns the busy chrome
           if (myGen === systemCheckGen) {
-            var rb = document.getElementById('sys-rerun-btn');
-            if (rb) {
-              rb.disabled = false;
-              rb.classList.remove('is-busy');
-            }
             var hp = document.getElementById('sys-host-panels');
             if (hp) hp.classList.remove('is-checking');
           }
@@ -1488,9 +1477,12 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                 runSystemChecks();
               }
             }
-            var rerun = document.getElementById('sys-rerun-btn');
-            if (rerun) {
-              rerun.addEventListener('click', function () { ensureSystemChecked(true); });
+            var summaryBtn = document.getElementById('sys-summary');
+            if (summaryBtn) {
+              summaryBtn.addEventListener('click', function () {
+                if (summaryBtn.disabled || summaryBtn.classList.contains('is-busy')) return;
+                ensureSystemChecked(true);
+              });
             }
             // first page load
             setTimeout(function () { ensureSystemChecked(false); }, 0);

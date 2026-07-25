@@ -1253,7 +1253,7 @@ body.has-project .global-lang-switch {
   justify-content: flex-end;
   min-width: 0;
 }
-/* Gate: chip + visible reason (why Pilot-only / blocked / ready). */
+/* Gate: single clickable status chip (label + refresh). Reason = title only. */
 .sys-gate {
   display: flex;
   flex-direction: row;
@@ -1263,32 +1263,14 @@ body.has-project .global-lang-switch {
   min-width: 0;
   max-width: min(420px, 52vw);
 }
-.sys-gate-reason {
-  display: inline-block;
-  min-width: 0;
-  max-width: min(280px, 40vw);
-  font-size: var(--fs-xs);
-  line-height: 1.35;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-.sys-gate-reason:empty,
-.sys-gate-reason[hidden] {
-  display: none !important;
-}
-.sys-gate-reason.status-warn {
-  color: var(--warn);
-}
-.sys-gate-reason.status-fail {
-  color: var(--red);
-}
-.sys-gate-reason.status-pass {
-  color: var(--ok);
-}
-.sys-summary {
+button.sys-summary {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--mono);
   font-size: var(--fs-sm);
   font-weight: 700;
@@ -1301,6 +1283,32 @@ body.has-project .global-lang-switch {
   color: var(--text-dim);
   white-space: nowrap;
   flex: 0 0 auto;
+  line-height: 1.2;
+}
+button.sys-summary:hover:not(:disabled):not(.is-busy) {
+  filter: brightness(1.08);
+}
+button.sys-summary:focus-visible {
+  outline: 2px solid rgba(232, 33, 39, 0.55);
+  outline-offset: 2px;
+}
+button.sys-summary:disabled,
+button.sys-summary.is-busy {
+  cursor: wait;
+  opacity: 0.9;
+}
+.sys-summary-ico {
+  display: inline-block;
+  line-height: 1;
+  flex: 0 0 auto;
+  transition: transform 0.15s ease;
+}
+.sys-summary.is-busy .sys-summary-ico,
+.sys-summary.is-checking .sys-summary-ico {
+  animation: sys-spin 0.85s linear infinite;
+}
+.sys-summary-label {
+  min-width: 0;
 }
 .sys-summary.is-checking {
   color: var(--text-dim);
@@ -1325,19 +1333,6 @@ body.has-project .global-lang-switch {
 }
 .sys-summary.status-idle {
   color: var(--text-dim);
-}
-#sys-rerun-btn .sys-rerun-ico {
-  display: inline-block;
-  margin-right: 4px;
-  line-height: 1;
-  transition: transform 0.15s ease;
-}
-#sys-rerun-btn.is-busy {
-  opacity: 0.85;
-  cursor: wait;
-}
-#sys-rerun-btn.is-busy .sys-rerun-ico {
-  animation: sys-spin 0.85s linear infinite;
 }
 @keyframes sys-spin {
   to { transform: rotate(360deg); }

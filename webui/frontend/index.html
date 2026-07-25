@@ -6,7 +6,7 @@
   <title>psyclaw-webui</title>
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=252">
+    <link rel="stylesheet" href="style.css?v=254">
     </head>
   <body class="no-project">
     <!-- Workspace gate: must open/create a folder before Builder/System/Run -->
@@ -62,16 +62,20 @@
                       <p class="muted sys-sub" data-i18n="sys.sub">Machine profile · PsychoPy readiness · live RT / path tests.</p>
                     </div>
                     <div class="sys-actions">
-                      <div class="sys-gate" id="sys-gate">
-                        <span id="sys-summary" class="sys-summary status-idle">—</span>
-                        <span class="sys-gate-reason muted" id="sys-gate-reason"></span>
-                      </div>
-                      <span class="sys-meta-inline muted" id="sys-meta-inline">—</span>
-                      <button type="button" class="btn btn-secondary" id="sys-rerun-btn">
-                        <span class="sys-rerun-ico" aria-hidden="true">&#8634;</span>
-                        <span data-i18n="sys.rerun">Re-check host</span>
-                      </button>
-                    </div>
+                                          <div class="sys-gate" id="sys-gate">
+                                            <button
+                                              type="button"
+                                              id="sys-summary"
+                                              class="sys-summary status-idle"
+                                              data-i18n-title="sys.recheckHint"
+                                              title="Click to re-check host"
+                                            >
+                                              <span class="sys-summary-ico" aria-hidden="true">&#8634;</span>
+                                              <span class="sys-summary-label">—</span>
+                                            </button>
+                                          </div>
+                                          <span class="sys-meta-inline muted" id="sys-meta-inline">—</span>
+                                        </div>
                   </div>
 
                   <!-- left: form_factor silhouette · right: hardware / input / engine info -->
@@ -795,9 +799,9 @@
     </footer>
 
     <!-- i18n → builder (parts assembled into builder.js) → app system/run → shell -->
-    <script src="i18n.js?v=261"></script>
-        <script src="builder.js?v=260"></script>
-        <script src="app-system.js?v=260"></script>
+    <script src="i18n.js?v=262"></script>
+            <script src="builder.js?v=260"></script>
+            <script src="app-system.js?v=263"></script>
         <script src="app-run.js?v=261"></script>
         <script src="app.js?v=260"></script>
   </body>

@@ -88,13 +88,49 @@ ASK RUN  (agent asks — do not wait for the user to invent the run request)
 | Design only / do not run | stop once marker is ready |
 | First-time full setup | doctor → consent → install gaps only |
 
+## One-shot install (skill source + webui)
+
+Scripts live in **`skills/psyclaw/`** (also available after any monorepo clone):
+
+| OS | Entry | Default target |
+|----|--------|----------------|
+| **Windows** | `skills\psyclaw\install-all.bat` | `%USERPROFILE%\psyclaw` |
+| **macOS / Linux** | `skills/psyclaw/install-full.sh` | `~/psyclaw` |
+
+```bat
+REM Windows (cmd) — optional path arg; skip pause with PSYCLAW_NONINTERACTIVE=1
+set PSYCLAW_NONINTERACTIVE=1
+skills\psyclaw\install-all.bat
+REM or: skills\psyclaw\install-all.bat D:\lab\psyclaw
+```
+
+```bash
+# Unix
+chmod +x skills/psyclaw/install-full.sh
+./skills/psyclaw/install-full.sh
+# or: ./skills/psyclaw/install-full.sh /path/to/psyclaw
+```
+
+What the one-shot does:
+
+1. `git clone` (or `git pull` if already a monorepo) **Paradeluxe/psyclaw**
+2. Creates `webui/.venv` + `pip install -r webui/requirements.txt`
+3. Writes `~/.psyclaw/config.json` → `webui_root`
+4. **Prints** CLI-specific skill install lines (does **not** force Hermes/Claude)
+
+Then start: `cd webui && python start.py` → http://127.0.0.1:8876  
+PsychoPy is still separate (needed only to run subjects) — see INSTALL.
+
+**Smoke-checked (Windows, 2026-07-25):** fresh clone → venv → flask import → `/api/health` `app=psyclaw-webui` / `status=ok`.
+
 ## Install details
 
 Full webui setup, PsychoPy configuration, update, and doctor:
 - **`webui/docs/INSTALL.md`** — canonical lab app install
 - **`skills/psyclaw/references/install-orchestrator.md`** — agent-side orchestration
+- **One-shot above** — first machine / “装全套” entry
 
-First use / full lab setup: doctor gaps → **ask consent** → install only missing pieces.
+First use / full lab setup: doctor gaps → **ask consent** → install only missing pieces (or run one-shot with consent).
 
 ## Repo layout
 
@@ -148,7 +184,7 @@ Trunk stays:
 - [x] private `Paradeluxe/psyclaw-webui` deprecated banner → monorepo `webui/` (`dfb127f`; not archived)
 - [x] `master` skill-only banner → use `main` monorepo (`7765521`; branch kept)
 - [x] docs paths → `Paradeluxe/psyclaw` + `skills/psyclaw` + `webui/` (no `psyclaw-skill/` tree)
-- [ ] one-shot install skill+webui (`install-all.bat` / `install-full.sh`) real-machine verify
+- [x] one-shot install (`install-all.bat` / `install-full.sh`) smoke + README entry (CRLF bat, working `python` probe)
 
 #### P2 — webui polish
 
@@ -167,7 +203,7 @@ Trunk stays:
 
 1. ~~private webui archive note + master banner~~  
 2. ~~monorepo path docs~~  
-3. install-all smoke  
+3. ~~install-all smoke~~  
 4. System/Run polish  
 5. frontend split (own PR)  
 6. vault local commit  

@@ -54,7 +54,27 @@ python scripts/user_config.py remember
 
 **Already installed?** If any step above finds a valid tree → **skip clone**; use **§ Update** only. Do not install a second copy unless the user asks for a new location.
 
-First-time only (nothing found): ask **default vs custom path**, then clone, then `python scripts/user_config.py remember`.
+First-time only (nothing found): ask **default vs custom path**, then either:
+
+**A. One-shot (preferred)** — from any monorepo checkout or after downloading just the scripts:
+
+```bat
+REM Windows
+set PSYCLAW_NONINTERACTIVE=1
+path\to\psyclaw\skills\psyclaw\install-all.bat
+REM optional custom root: install-all.bat D:\lab\psyclaw
+```
+
+```bash
+# Unix
+./skills/psyclaw/install-full.sh
+# optional: ./skills/psyclaw/install-full.sh /path/to/psyclaw
+```
+
+One-shot: clone/pull · create `webui/.venv` · `pip install -r requirements.txt` · write `~/.psyclaw/config.json`.  
+It **prints** agent skill install commands; it does not install Hermes for you.
+
+**B. Manual clone + remember**
 
 ```bash
 # default layout (Windows cmd)

@@ -52,12 +52,14 @@ On first use (or when user says 全装 / 部署 / setup):
    # or: start.py / make_desktop_shortcut.py auto-remember
    ```
    Never clone a second copy without asking.
-4. **If webui missing:** ask once (consent + location):
-   - **Default (recommended):** `git clone https://github.com/Paradeluxe/psyclaw.git ~/psyclaw`
-   - **Custom:** user path → clone there
-   Then `cd webui && python scripts/user_config.py remember`.
+4. **If webui missing:** ask once (consent + location), then prefer **one-shot**:
+   - **Windows:** `skills\psyclaw\install-all.bat` [optional monorepo path]  
+     (`set PSYCLAW_NONINTERACTIVE=1` to skip `pause`)
+   - **Unix:** `skills/psyclaw/install-full.sh` [optional path]
+   - Manual equivalent: `git clone https://github.com/Paradeluxe/psyclaw.git ~/psyclaw` → `webui` venv + `user_config.py remember`
+   One-shot already remembers `webui_root`. Custom path = pass the folder as the first argument.
 5. **If run needed:** probe PsychoPy only (env → library → standalone). Missing → **webui** `docs/INSTALL.md` (skill does not freestyle-upgrade PsychoPy).
-6. Missing skill → install skill gap with consent (CLI-specific command; repo path is `Paradeluxe/psyclaw/skills/psyclaw`).
+6. Missing skill → install skill gap with consent (CLI-specific command; repo path is `Paradeluxe/psyclaw/skills/psyclaw`). One-shot **prints** these lines; it does not run Hermes for you.
 7. All present / updated → do the task (write `<folderName>.psyclaw`).
 
 Not every turn reinstalls. See **Updates** below when the user asks to update.
@@ -129,11 +131,21 @@ named `psyclaw`. Full path: `Paradeluxe/psyclaw/skills/psyclaw`.
 Maintainers edit `skills/psyclaw/` in the monorepo; end users install
 via their agent's skill installer.
 
+## One-shot scripts (entry)
+
+| File | Platform | Does |
+|------|----------|------|
+| `skills/psyclaw/install-all.bat` | Windows | clone/pull monorepo · `webui/.venv` · pip · `user_config remember` · print skill CLI lines |
+| `skills/psyclaw/install-full.sh` | macOS/Linux | same |
+
+Root README § **One-shot install** is the user-facing pointer. Bat files **must** be CRLF (see repo `.gitattributes`).
+
 ## Layer roadmap
 
 | Layer | Shape |
 |-------|-------|
 | A | git clone + webui venv + docs/INSTALL.md |
+| A′ | **One-shot** — `install-all.bat` / `install-full.sh` (clone + venv + remember) |
 | B | **Double-click self-bootstrap** — `webui/start.bat` / `start.command` / `start.sh` → `start.py` creates `.venv` + `pip install -r requirements.txt` on first launch; desktop shortcut best-effort |
 | C | zip / installer with embedded Python (future) |
 

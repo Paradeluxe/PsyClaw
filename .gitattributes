@@ -1,0 +1,6 @@
+# Windows batch must stay CRLF or cmd.exe mangles commands (set/if become "et"/"not").
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts: LF on all platforms
+*.sh text eol=lf

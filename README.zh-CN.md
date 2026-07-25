@@ -129,11 +129,36 @@ python start.py
 
 **不要**再 clone 已弃用的独立仓 `Paradeluxe/psyclaw-webui` 或旧 skill 线当现行版；请用本 monorepo 的 **`main`**。
 
-完整 webui 安装 / PsychoPy / 更新 / doctor：
+### 一次装通（推荐入口）
+
+| 系统 | 入口 | 默认装到 |
+|------|------|----------|
+| **Windows** | `skills\psyclaw\install-all.bat` | `%USERPROFILE%\psyclaw` |
+| **macOS / Linux** | `skills/psyclaw/install-full.sh` | `~/psyclaw` |
+
+```bat
+REM Windows — 可带路径；无人值守：set PSYCLAW_NONINTERACTIVE=1
+skills\psyclaw\install-all.bat
+REM 或: skills\psyclaw\install-all.bat D:\lab\psyclaw
+```
+
+```bash
+chmod +x skills/psyclaw/install-full.sh
+./skills/psyclaw/install-full.sh          # 或带自定义路径
+```
+
+脚本会：clone/pull monorepo → 建 `webui/.venv` 并装 Flask 依赖 → 写入 `~/.psyclaw/config.json` 的 `webui_root` → **打印**各 CLI 装 skill 命令（不强制装 Hermes）。  
+然后：`cd webui && python start.py` → http://127.0.0.1:8876  
+PsychoPy 仍单独装（只跑被试时需要）。
+
+**实机验收（Windows，2026-07-25）：** 全新目录 clone → venv → flask → `/api/health` 返回 `app=psyclaw-webui` / `status=ok`。
+
+### 分步文档
+
 - **`webui/docs/INSTALL.md`** — 实验室端规范
 - **`skills/psyclaw/references/install-orchestrator.md`** — agent 侧编排
 
-首次使用 / 全装：doctor 查缺 → **征得同意** → 只装缺的。
+首次使用 / 全装：doctor 查缺 → **征得同意** → 只装缺的；或同意后跑上面的一次装通。
 
 ## 仓库布局
 
@@ -192,7 +217,7 @@ python skills/psyclaw/scripts/doctor.py
 - [x] **私有仓 `Paradeluxe/psyclaw-webui` 归档策略** — 轻方案：README 顶部 deprecated → monorepo `webui/`（`dfb127f`）；未 Archive 仓库
 - [x] **`master` 旧 skill-only 线** — README 顶部 banner：请用 `main` monorepo（`7765521`）；未删分支
 - [x] **装机路径文档** — 去掉 `psyclaw-skill/` 旧树与「另行安装独立 webui」表述；统一 `Paradeluxe/psyclaw` + `skills/psyclaw` + `webui/`
-- [ ] **一次安装 skill+webui** — `install-all.bat` / `install-full.sh` 实机验收 + 文档入口写清
+- [x] **一次安装 skill+webui** — `install-all.bat` / `install-full.sh` 实机验收 + README 入口（bat CRLF、可用 `python` 探测）
 
 #### P2 — webui 产品抛光
 
@@ -211,7 +236,7 @@ python skills/psyclaw/scripts/doctor.py
 
 1. ~~私有 webui 仓归档文案 + master banner~~  
 2. ~~文档路径统一 monorepo~~  
-3. install-all 实机一次装通  
+3. ~~install-all 实机一次装通~~  
 4. System/Run 状态与空态抛光  
 5. 前端拆模块（独立 PR）  
 6. vault commit（仅本地）

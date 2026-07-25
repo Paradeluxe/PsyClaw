@@ -147,8 +147,8 @@ python skills/psyclaw/scripts/doctor.py
 
 #### P1 — 仓库 / 分发卫生
 
-- [ ] **私有仓 `Paradeluxe/psyclaw-webui` 归档策略** — monorepo `webui/` 已是真源；私有仓停在 `404b003`（debug 8877）。选：归档 / README 指向 monorepo / 或标 deprecated
-- [ ] **`master` 旧 skill-only 线** — default 已切 main；决定是否 archive/delete `master` 或加 banner 防误 clone
+- [x] **私有仓 `Paradeluxe/psyclaw-webui` 归档策略** — 轻方案：README 顶部 deprecated → monorepo `webui/`（`dfb127f`）；未 Archive 仓库
+- [x] **`master` 旧 skill-only 线** — README 顶部 banner：请用 `main` monorepo（`7765521`）；未删分支
 - [ ] **装机路径文档** — SKILL/README 仍可能写 `Paradeluxe/psyclaw-skill`；统一为 `Paradeluxe/psyclaw`（`skills/psyclaw`）
 - [ ] **一次安装 skill+webui** — `install-all.bat` / `install-full.sh` 实机验收 + 文档入口写清
 
@@ -167,7 +167,7 @@ python skills/psyclaw/scripts/doctor.py
 
 ### 建议排期
 
-1. 私有 webui 仓归档文案 + master banner  
+1. ~~私有 webui 仓归档文案 + master banner~~  
 2. 文档路径统一 monorepo  
 3. install-all 实机一次装通  
 4. System/Run 状态与空态抛光  

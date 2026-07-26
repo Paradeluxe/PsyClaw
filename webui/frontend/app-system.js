@@ -201,23 +201,83 @@
     return t('sys.connOther');
   }
 
-  function _summarizeInputs(list) {
+  function _summarizeInputs(list, kind) {
+    // kind: 'keyboard' | 'mouse' | undefined — collapses multi-HID noise (one physical → many Win32 rows)
     list = list || [];
     if (!list.length) {
       return { text: t('sys.notDetected'), conn: 'other', multi: false, title: '', empty: true, status: 'info' };
     }
     function isVirtual(d) {
       var s = ((d && d.instance_id) || '') + ' ' + ((d && d.name) || '');
-      return /GVINPUT|GameViewer|AskLink|VIRTUAL|RDP|VMware|vhid/i.test(s);
+      return /GVINPUT|GameViewer|AskLink|ALBHID|ALHID|VIRTUAL|RDP|VMware|vhid|TsUsb|Citrix|Parsec|Sunshine|Virtual\s*HID/i.test(s);
+    }
+    function physicalKey(d) {
+      var id = String((d && d.instance_id) || '');
+      var m = id.match(/VID_[0-9A-F]+&PID_[0-9A-F]+/i);
+      if (m) return m[0].toUpperCase();
+      // same composite root without VID (e.g. HID\FOO&COL01)
+      m = id.match(/^(?:HID|USB)\\([^\\]+)/i);
+      if (m) return m[1].replace(/&COL[0-9A-F]+$/i, '').toUpperCase();
+      return id.toUpperCase() || String((d && d.name) || '');
+    }
+    function isGenericName(n) {
+      n = String(n || '').trim();
+      return !n || /^(HID-compliant\s+(mouse|device|consumer control device)|USB\s+Input\s+Device|USB\s+Pointing\s+Device|HID Keyboard Device|Enhanced \(101- or 102-key\)|Standard PS\/2 Keyboard|PS\/2 Compatible Mouse)$/i.test(n);
+    }
+    function vendorLabel(d) {
+      var id = String((d && d.instance_id) || '');
+      var m = id.match(/VID_([0-9A-F]{4})/i);
+      if (!m) return '';
+      var map = {
+        '046D': 'Logitech',
+        '045E': 'Microsoft',
+        '05AC': 'Apple',
+        '1532': 'Razer',
+        '0951': 'HyperX',
+        '1B1C': 'Corsair',
+        '0B05': 'ASUS',
+        '1038': 'SteelSeries',
+        '04F2': 'Chicony',
+        '0A5C': 'Broadcom',
+        '8087': 'Intel',
+        '0BDA': 'Realtek',
+      };
+      return map[m[1].toUpperCase()] || '';
+    }
+    function shortLabel(d) {
+      var v = vendorLabel(d);
+      if (v) return v;
+      var n = String((d && d.name) || '').trim();
+      if (!isGenericName(n)) return n;
+      return '';
     }
     var real = list.filter(function (d) { return !isVirtual(d); });
     var onlyVirtual = !real.length && list.length > 0;
     var pool = real.length ? real : list;
-    var ranked = pool.slice().sort(function (a, b) {
+    // collapse HID collections → one row per physical device
+    var byPhys = {};
+    var physOrder = [];
+    pool.forEach(function (d) {
+      var k = physicalKey(d);
+      if (!byPhys[k]) {
+        byPhys[k] = d;
+        physOrder.push(k);
+      } else {
+        // prefer VID entry / non-generic name
+        var cur = byPhys[k];
+        var score = function (x) {
+          var s = 0;
+          if (/VID_/i.test(x.instance_id || '')) s += 2;
+          if (shortLabel(x)) s += 1;
+          return s;
+        };
+        if (score(d) > score(cur)) byPhys[k] = d;
+      }
+    });
+    var ranked = physOrder.map(function (k) { return byPhys[k]; }).sort(function (a, b) {
       var order = { bluetooth: 0, usb: 1, ps2: 2, 'built-in': 3, other: 4 };
       var sa = order[a.connection] != null ? order[a.connection] : 5;
       var sb = order[b.connection] != null ? order[b.connection] : 5;
-      // prefer vendor VID over generic HID names
       var na = /VID_/i.test(a.instance_id || '') ? 0 : 1;
       var nb = /VID_/i.test(b.instance_id || '') ? 0 : 1;
       if (sa !== sb) return sa - sb;
@@ -225,36 +285,48 @@
     });
     var primary = ranked[0];
     var conn = primary.connection || 'other';
-    var names = [];
-    var conns = {};
+    var labels = [];
     ranked.forEach(function (d) {
-      conns[d.connection || 'other'] = true;
-      var n = String(d.name || '').trim();
-      if (n && names.indexOf(n) < 0 && names.length < 2) names.push(n);
+      var lab = shortLabel(d);
+      if (lab && labels.indexOf(lab) < 0) labels.push(lab);
     });
-    // Same face as Mic/Speaker: names joined with · ; connection in title + prefix when useful
-    var text = names.length ? names.join(' · ') : _connLabel(conn);
-    if (names.length && conn && conn !== 'other') {
-      text = _connLabel(conn) + ' · ' + text;
+    var nPhys = ranked.length;
+    var noun = (kind === 'keyboard')
+      ? (nPhys === 1 ? 'keyboard' : 'keyboards')
+      : (kind === 'mouse')
+        ? (nPhys === 1 ? 'mouse' : 'mice')
+        : (nPhys === 1 ? 'device' : 'devices');
+    // Compact face: USB · Logitech  |  USB · Logitech (+1)  |  USB · 2 mice
+    var text;
+    if (labels.length === 1 && nPhys === 1) {
+      text = _connLabel(conn) + ' · ' + labels[0];
+    } else if (labels.length === 1 && nPhys > 1) {
+      text = _connLabel(conn) + ' · ' + labels[0] + ' (+' + (nPhys - 1) + ')';
+    } else if (labels.length >= 2) {
+      text = _connLabel(conn) + ' · ' + labels.slice(0, 2).join(' · ');
+      if (nPhys > 2) text += ' (+' + (nPhys - 2) + ')';
+    } else {
+      // all generic names after collapse
+      text = _connLabel(conn) + ' · ' + (nPhys > 1 ? (nPhys + ' ' + noun) : noun);
     }
-    var nExtra = ranked.length - names.length;
-    if (nExtra > 0 && names.length) text += ' (+' + nExtra + ')';
-    var nConn = Object.keys(conns).length;
-    if (nConn > 1) text += ' (+' + (nConn - 1) + ' more)';
     var st = onlyVirtual ? 'warn' : 'pass';
     var titleBits = ranked.map(function (d) {
-      return _connLabel(d.connection) + ': ' + (d.name || '?');
+      var lab = shortLabel(d) || d.name || '?';
+      return _connLabel(d.connection) + ': ' + lab + (d.instance_id ? ' · ' + d.instance_id : '');
     });
     if (onlyVirtual) titleBits.push('(virtual only)');
+    if (list.length > nPhys) titleBits.push('(' + list.length + ' HID rows → ' + nPhys + ' physical)');
     return {
       text: text,
       conn: conn,
-      multi: names.length > 1 || ranked.length > 1,
+      multi: nPhys > 1,
       title: titleBits.join('\n'),
       empty: false,
       status: st,
+      count: nPhys,
     };
   }
+
 
   /** Mic / speaker summary. Prefer real OK endpoints over drivers/virtual. */
   var lastHostMics = [];
@@ -967,8 +1039,8 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
             diskTitle
           );
 
-        var kb = _summarizeInputs(hw.keyboards);
-        var mouse = _summarizeInputs(hw.mice);
+        var kb = _summarizeInputs(hw.keyboards, 'keyboard');
+        var mouse = _summarizeInputs(hw.mice, 'mouse');
         // Host microphones[] is authority (incl. empty = no capture endpoint).
         // Do not fall back to browser lists when probe returned the field.
         var micList = Array.isArray(hw.microphones) ? hw.microphones : lastHostMics;

@@ -94,13 +94,14 @@ def test_finished_restores_idle_last_status():
 
 
 def test_changed_run_assets_are_cache_busted():
+    # Floor versions from the mode/status ship; later bumps must stay >= floor.
     minimum = {
         "style.css": 298,
         "i18n.js": 276,
         "app-system.js": 281,
         "app-run.js": 267,
     }
-    for asset, version in minimum.items():
-        assert f"{asset}?v={version}" in HTML
-    for asset in ("style.css", "i18n.js", "app-system.js", "app-run.js"):
-        assert re.search(rf"{re.escape(asset)}\?v=\d+", HTML)
+    for asset, floor in minimum.items():
+        m = re.search(rf"{re.escape(asset)}\?v=(\d+)", HTML)
+        assert m, f"missing cache bust for {asset}"
+        assert int(m.group(1)) >= floor, f"{asset} v={m.group(1)} < floor {floor}"

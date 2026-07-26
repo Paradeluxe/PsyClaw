@@ -26,6 +26,8 @@ psyclaw/
 **Not in this repo:** a local **psyclaw-vault** (papers / `experiments/` smoke) is a separate machine folder with **no GitHub remote**.  
 Vault = local papers + experiment data; **product source is only this monorepo.**
 
+**150-paper replication pipeline:** see [docs/replication150.md](docs/replication150.md) and [docs/replication150-acceptance.md](docs/replication150-acceptance.md).
+
 ## What's here
 
 | Part | Role | Who uses it |

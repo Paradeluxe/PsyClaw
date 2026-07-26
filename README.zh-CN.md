@@ -26,6 +26,8 @@ psyclaw/
 **不在本仓：** 本机可选的 **psyclaw-vault**（论文 / `experiments/` 试跑）是**另一文件夹**，**无 GitHub remote**。  
 **vault = 本地 papers + 实验数据；产品源码只在本 monorepo。**
 
+**150 篇复现管线：** 见 [docs/replication150.md](docs/replication150.md) 与 [docs/replication150-acceptance.md](docs/replication150-acceptance.md)。
+
 | 部分 | 作用 | 使用者 |
 |------|------|--------|
 | **Skill**（`skills/psyclaw/`） | 写实验说明书（`<folderName>.psyclaw`） | AI agent / CLI |

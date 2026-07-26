@@ -102,3 +102,116 @@ def test_workspace_tabs_render_without_browser_errors(live_app_url: str) -> None
         assert console_errors == []
         assert request_failures == []
         browser.close()
+
+
+def test_run_status_last_mode_content_and_colors(live_app_url: str) -> None:
+    playwright = pytest.importorskip("playwright.sync_api")
+    executable = _browser_executable()
+    if not executable:
+        pytest.skip("Chrome/Edge executable not available")
+
+    project = ROOT / "tests" / "example_experiment"
+
+    with playwright.sync_playwright() as runner:
+        browser = runner.chromium.launch(headless=True, executable_path=executable)
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        page.goto(live_app_url, wait_until="networkidle", timeout=30_000)
+        page.evaluate("() => localStorage.setItem('psyclaw.lang', 'en')")
+        page.evaluate(
+            "([key, value]) => localStorage.setItem(key, JSON.stringify(value))",
+            [
+                "psyclaw.recentProjects",
+                [{"path": str(project), "name": "example_experiment"}],
+            ],
+        )
+        page.reload(wait_until="networkidle", timeout=30_000)
+        page.wait_for_function(
+            "() => document.body.classList.contains('has-project')", timeout=15_000
+        )
+        page.locator('.tab-btn[data-tab="run"]').click()
+        # Wait until gate leaves checking (badge not gate-checking) or timeout.
+        page.wait_for_function(
+            """() => {
+              const b = document.getElementById('run-status-badge');
+              if (!b) return false;
+              return !(b.className || '').includes('gate-checking');
+            }""",
+            timeout=20_000,
+        )
+
+        expected = {
+            "run": ("Last status: Start", "rgb(61, 204, 122)", "last-mode-run"),
+            "pilot": ("Last status: Pilot", "rgb(183, 148, 246)", "last-mode-pilot"),
+            "autopilot": ("Last status: Autopilot", "rgb(139, 155, 180)", "last-mode-autopilot"),
+        }
+        for mode, (text, color, cls) in expected.items():
+            page.evaluate(
+                """(mode) => {
+                  if (!(window.PsyClawSystem && window.PsyClawSystem.setLastProven)) {
+                    throw new Error('PsyClawSystem.setLastProven missing');
+                  }
+                  window.PsyClawSystem.setLastProven(mode);
+                }""",
+                mode,
+            )
+            badge = page.locator("#run-status-badge")
+            content = badge.inner_text().strip()
+            assert content.upper().startswith(text.upper()), content
+            classes = badge.get_attribute("class") or ""
+            assert cls in classes, classes
+            # Block safety red may override mode color on this host — still keep mode class/text.
+            if "gate-block" not in classes:
+                assert badge.evaluate("el => getComputedStyle(el).color") == color
+        browser.close()
+
+
+@pytest.mark.parametrize(
+    ("lang", "pilot_text", "autopilot_text"),
+    [
+        ("en", "Pilot", "Autopilot"),
+        ("zh", "试飞", "自动驾驶"),
+    ],
+)
+def test_run_mode_controls_are_readable_in_both_languages(
+    live_app_url: str,
+    lang: str,
+    pilot_text: str,
+    autopilot_text: str,
+) -> None:
+    playwright = pytest.importorskip("playwright.sync_api")
+    executable = _browser_executable()
+    if not executable:
+        pytest.skip("Chrome/Edge executable not available")
+
+    project = ROOT / "tests" / "example_experiment"
+
+    with playwright.sync_playwright() as runner:
+        browser = runner.chromium.launch(headless=True, executable_path=executable)
+        for viewport in ({"width": 1440, "height": 900}, {"width": 800, "height": 700}):
+            page = browser.new_page(viewport=viewport)
+            page.goto(live_app_url, wait_until="networkidle", timeout=30_000)
+            page.evaluate(
+                "([k, v]) => localStorage.setItem(k, v)",
+                ["psyclaw.lang", lang],
+            )
+            page.evaluate(
+                "([key, value]) => localStorage.setItem(key, JSON.stringify(value))",
+                [
+                    "psyclaw.recentProjects",
+                    [{"path": str(project), "name": "example_experiment"}],
+                ],
+            )
+            page.reload(wait_until="networkidle", timeout=30_000)
+            page.wait_for_function(
+                "() => document.body.classList.contains('has-project')", timeout=15_000
+            )
+            page.locator('.tab-btn[data-tab="run"]').click()
+            page.wait_for_timeout(200)
+            pilot = page.locator("#pilot-run-btn")
+            autopilot = page.locator("#autopilot-run-btn")
+            assert pilot_text in pilot.inner_text()
+            assert autopilot_text in autopilot.inner_text()
+            assert pilot.evaluate("el => el.scrollWidth <= el.clientWidth + 1")
+            assert autopilot.evaluate("el => el.scrollWidth <= el.clientWidth + 1")
+            page.close()
+        browser.close()

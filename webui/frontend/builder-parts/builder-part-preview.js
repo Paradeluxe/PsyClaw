@@ -880,6 +880,20 @@
       var conditions = ensureLoopConditions(loop);
       var nCond = conditions.length;
       var cols = conditionColumns(conditions);
+      if ((loop.loopType || '') === 'weighted') {
+        ensureWeightColumn(loop);
+        // weight first when active
+        if (cols.indexOf('weight') < 0) {
+          cols = ['weight'].concat(cols);
+        } else if (cols.indexOf('weight') > 0) {
+          cols = ['weight'].concat(cols.filter(function (c) { return c !== 'weight'; }));
+        }
+      } else {
+        // Hide weight UI outside weighted; keep row.weight in data if present
+        cols = cols.filter(function (c) { return c !== 'weight'; });
+      }
+      // size attr floors only; widths via <colgroup>
+      var colCh = condColCharWidths(cols, conditions);
 
       var bar = el('div', 'cond-toolbar');
       var meta = el('div', 'cond-meta');
@@ -900,7 +914,7 @@
                 ? t('flow.chipStats', {
                     rows: nCond,
                     cols: cols.length,
-                    trials: ((loop.nReps || 1) * nCond)
+                    trials: loopTrialCount(loop)
                   })
                 : (cols.length
                     ? t('flow.chipStatsEmptyRows', { cols: cols.length })
@@ -926,6 +940,10 @@
         if (!name) return;
         if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
           alert('Column name must be identifier-like: letters/digits/_ (for $colName params)');
+          return;
+        }
+        if (name === 'weight' && (loop.loopType || '') !== 'weighted') {
+          alert(t('flow.weightNameReserved') || 'Column name "weight" is reserved for loopType=weighted');
           return;
         }
         ensureLoopConditions(loop);
@@ -1023,6 +1041,21 @@
       var table = document.createElement('table');
       table.className = 'loop-cond-preview is-wide is-editable';
 
+      // Fixed layout colgroup: # + weight(optional) fixed; text cols share rest; act fixed
+      var colgroup = document.createElement('colgroup');
+      var colIdx = document.createElement('col');
+      colIdx.className = 'cond-col-idx';
+      colgroup.appendChild(colIdx);
+      cols.forEach(function (c) {
+        var col = document.createElement('col');
+        col.className = c === 'weight' ? 'cond-col-weight' : 'cond-col-data';
+        colgroup.appendChild(col);
+      });
+      var colAct = document.createElement('col');
+      colAct.className = 'cond-col-act';
+      colgroup.appendChild(colAct);
+      table.appendChild(colgroup);
+
       var thead = document.createElement('thead');
       var headRow = document.createElement('tr');
       var thIdx = document.createElement('th');
@@ -1030,55 +1063,79 @@
       headRow.appendChild(thIdx);
       cols.forEach(function (c) {
         var th = document.createElement('th');
-        th.className = 'cond-col-head';
+        th.className = 'cond-col-head' + (c === 'weight' ? ' is-locked-col' : '');
         var headInner = el('div', 'cond-col-head-inner');
         var nameIn = document.createElement('input');
         nameIn.type = 'text';
         nameIn.className = 'cond-col-name';
         nameIn.value = c;
-        nameIn.title = 'Column name — use as $' + c + ' in component params';
-        nameIn.addEventListener('change', function () {
-          var neu = String(nameIn.value || '').trim();
-          if (!neu || neu === c) {
-            nameIn.value = c;
-            return;
-          }
-          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(neu)) {
-            alert('Column name must be identifier-like');
-            nameIn.value = c;
-            return;
-          }
-          if (cols.indexOf(neu) >= 0) {
-            alert('Column already exists: ' + neu);
-            nameIn.value = c;
-            return;
-          }
-          loop.conditions.forEach(function (row) {
-            if (!row) return;
-            row[neu] = row[c];
-            delete row[c];
+        var isWeightCol = (c === 'weight');
+        if (isWeightCol) {
+          nameIn.readOnly = true;
+          nameIn.classList.add('is-locked');
+          nameIn.title = t('flow.weightColLocked') || 'weight — required for loopType=weighted (cannot rename or delete)';
+        } else {
+          nameIn.title = 'Column name — use as $' + c + ' in component params';
+          nameIn.addEventListener('change', function () {
+            var neu = String(nameIn.value || '').trim();
+            if (!neu || neu === c) {
+              nameIn.value = c;
+              return;
+            }
+            if (neu === 'weight') {
+              alert(t('flow.weightNameReserved') || 'Column name "weight" is reserved');
+              nameIn.value = c;
+              return;
+            }
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(neu)) {
+              alert('Column name must be identifier-like');
+              nameIn.value = c;
+              return;
+            }
+            if (cols.indexOf(neu) >= 0) {
+              alert('Column already exists: ' + neu);
+              nameIn.value = c;
+              return;
+            }
+            loop.conditions.forEach(function (row) {
+              if (!row) return;
+              row[neu] = row[c];
+              delete row[c];
+            });
+            emitChange();
+            render();
           });
-          emitChange();
-          render();
-        });
+          nameIn.addEventListener('input', function () {
+            growInputToContent(nameIn, colCh[c] || 4);
+          });
+        }
+        applyContentChWidth(nameIn, colCh[c] || 4);
         headInner.appendChild(nameIn);
-        var delC = document.createElement('button');
-        delC.type = 'button';
-        delC.className = 'cond-col-del';
-        delC.setAttribute('aria-label', 'Delete column ' + c);
-        delC.textContent = '\u00d7';
-        delC.title = 'Delete column ' + c;
-        delC.addEventListener('click', function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!window.confirm('Delete column "' + c + '"?')) return;
-          loop.conditions.forEach(function (row) {
-            if (row) delete row[c];
+        if (!isWeightCol) {
+          var delC = document.createElement('button');
+          delC.type = 'button';
+          delC.className = 'cond-col-del';
+          delC.setAttribute('aria-label', 'Delete column ' + c);
+          delC.textContent = '\u00d7';
+          delC.title = 'Delete column ' + c;
+          delC.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (c === 'weight') return;
+            if (!window.confirm('Delete column "' + c + '"?')) return;
+            loop.conditions.forEach(function (row) {
+              if (row) delete row[c];
+            });
+            emitChange();
+            render();
           });
-          emitChange();
-          render();
-        });
-        headInner.appendChild(delC);
+          headInner.appendChild(delC);
+        } else {
+          var lockMark = el('span', 'cond-col-lock', '\u00b7');
+          lockMark.title = t('flow.weightColLocked') || 'weight column locked';
+          lockMark.setAttribute('aria-hidden', 'true');
+          headInner.appendChild(lockMark);
+        }
         th.appendChild(headInner);
         headRow.appendChild(th);
       });
@@ -1108,21 +1165,45 @@
         tr.appendChild(tdI);
         cols.forEach(function (c) {
           var td = document.createElement('td');
-          td.className = 'cond-cell';
+          td.className = 'cond-cell' + (c === 'weight' ? ' cond-cell-weight' : '');
           var inp = document.createElement('input');
-          inp.type = 'text';
-          inp.className = 'cond-cell-input';
+          var isWeight = (c === 'weight');
+          inp.type = isWeight ? 'number' : 'text';
+          if (isWeight) {
+            inp.min = '0';
+            inp.step = '1';
+            inp.className = 'cond-cell-input cond-weight-input';
+          } else {
+            inp.className = 'cond-cell-input';
+          }
           inp.value = row[c] == null ? '' : String(row[c]);
           inp.setAttribute('aria-label', c + ' row ' + (i + 1));
+          applyContentChWidth(inp, colCh[c] || (isWeight ? 3 : 4));
+          if (isWeight) inp.title = t('flow.weightHint') || 'Copies of this row in the bag (loopType=weighted)';
           inp.addEventListener('input', function () {
-            row[c] = inp.value;
+            if (isWeight) {
+              var v = parseInt(inp.value, 10);
+              row[c] = isNaN(v) || v < 0 ? 0 : v;
+            } else {
+              row[c] = inp.value;
+            }
+            growInputToContent(inp, colCh[c] || (isWeight ? 3 : 4));
             markDirty();
             softRefreshPreview();
           });
           inp.addEventListener('change', function () {
-            row[c] = inp.value;
-            emitChange();
-            softRefreshPreview();
+            if (isWeight) {
+              var v = parseInt(inp.value, 10);
+              row[c] = isNaN(v) || v < 0 ? 0 : v;
+              inp.value = String(row[c]);
+              emitChange();
+              renderConditionsPanel();
+              renderFlowList();
+            } else {
+              row[c] = inp.value;
+              emitChange();
+              softRefreshPreview();
+            }
           });
           td.appendChild(inp);
           tr.appendChild(td);
@@ -1191,19 +1272,25 @@
                       });
                       lfield(t('insp.nReps'), repsIn);
                       var typeIn = document.createElement('select');
-                      ['sequential', 'random', 'fullRandom'].forEach(function (t) {
+                      ['sequential', 'random', 'fullRandom', 'weighted'].forEach(function (lt) {
                         var opt = document.createElement('option');
-                        opt.value = t;
-                        opt.textContent = t;
-                        if ((loop.loopType || 'sequential') === t) opt.selected = true;
+                        opt.value = lt;
+                        opt.textContent = lt === 'weighted' ? (t('insp.loopTypeWeighted') || 'weighted') : lt;
+                        if ((loop.loopType || 'sequential') === lt) opt.selected = true;
                         typeIn.appendChild(opt);
                       });
                       typeIn.addEventListener('change', function () {
                         loop.loopType = typeIn.value || 'sequential';
+                        if (loop.loopType === 'weighted') ensureWeightColumn(loop);
                         emitChange();
+                        renderConditionsPanel();
+                        renderFlowList();
                         renderJsonPreview();
                       });
                       lfield(t('insp.loopType'), typeIn);
+                      if ((loop.loopType || '') === 'weighted') {
+                        box.appendChild(el('p', 'muted builder-ms-hint', t('insp.weightedHint')));
+                      }
 
                       var actions = el('div', 'builder-insp-actions');
                       var unwrapBtn = el('button', 'btn btn-secondary');

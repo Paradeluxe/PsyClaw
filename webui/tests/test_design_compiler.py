@@ -100,6 +100,55 @@ def test_expand_conditions_random_shuffles_within_rep():
     assert len(words) == 4
 
 
+
+
+def test_expand_conditions_weighted_exact_counts():
+    """weighted = weight copies → bag × nReps → one shuffle; counts exact."""
+    import random
+    from collections import Counter
+
+    flow = [{
+        "kind": "loop",
+        "name": "trials",
+        "nReps": 2,
+        "loopType": "weighted",
+        "conditions": [
+            {"word": "go", "weight": 3},
+            {"word": "nogo", "weight": 1},
+        ],
+        "children": [{"kind": "routine", "routine": "trial"}],
+    }]
+    steps = expand_flow_py(flow, rng=random.Random(42))
+    words = [s["trialVars"]["word"] for s in steps]
+    assert len(words) == 8  # (3+1) * 2
+    c = Counter(words)
+    assert c["go"] == 6
+    assert c["nogo"] == 2
+    # still a shuffle (not pure sequential go,go,go,nogo ×2 with high probability under seed — check not identical to unshuffled bag order is optional)
+    assert all(s["nReps"] == 8 for s in steps)
+    assert [s["thisN"] for s in steps] == list(range(8))
+
+
+def test_expand_conditions_weighted_default_weight_one():
+    flow = [{
+        "kind": "loop",
+        "name": "trials",
+        "nReps": 1,
+        "loopType": "weighted",
+        "conditions": [{"word": "A"}, {"word": "B"}, {"word": "C"}],
+        "children": [{"kind": "routine", "routine": "trial"}],
+    }]
+    steps = expand_flow_py(flow)
+    words = sorted(s["trialVars"]["word"] for s in steps)
+    assert words == ["A", "B", "C"]
+
+
+def test_normalize_loop_type_weighted_aliases():
+    from design_compiler import _normalize_loop_type
+    assert _normalize_loop_type("weighted") == "weighted"
+    assert _normalize_loop_type("weighted_random") == "weighted"
+    assert _normalize_loop_type("proportion") == "weighted"
+
 def test_compile_design_emits_status_draw_loop():
     design = {
         "name": "t",

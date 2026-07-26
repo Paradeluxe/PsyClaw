@@ -139,6 +139,11 @@ participant_id = str(SESSION.get("participant_id") or "P01").strip() or "P01"
 session_id = str(SESSION.get("session") or "1").strip() or "1"
 session_date = str(SESSION.get("date") or time.strftime("%Y-%m-%d %H:%M:%S")).strip()
 experimenter = str(SESSION.get("experimenter") or "").strip()
+if not experimenter:
+    _pid0 = str(SESSION.get("participant_id") or SESSION.get("participant") or "").strip()
+    if _pid0 == "P_autopilot" or _pid0.startswith("P_autopilot"):
+        experimenter = "PsyClaw AI"
+
 session_notes = str(SESSION.get("notes") or "").strip()
 participant_name = str(SESSION.get("participant_name") or SESSION.get("name") or "").strip()
 session_uid = str(SESSION.get("uid") or SESSION.get("exp_uid") or "").strip()
@@ -409,7 +414,7 @@ def expand_flow(flow, loop_name="", this_n=None, n_reps=None, trial_vars=None):
 
     Loop without conditions: nReps times full children sequence.
     Loop with conditions (embedded or file): nReps × condition rows.
-      loopType: sequential | random (shuffle each rep) | fullRandom (shuffle all).
+      loopType: sequential | random | fullRandom | weighted (weight copies → bag → shuffle; exact counts).
     Nested loops recurse. trial_vars merge outer→inner.
     """
     out = []
@@ -431,7 +436,26 @@ def expand_flow(flow, loop_name="", this_n=None, n_reps=None, trial_vars=None):
                     ))
             else:
                 schedule = []  # list of (thisN_label, cond_dict)
-                if loop_type == "fullrandom":
+                if loop_type in ("weighted", "weightedrandom", "proportion", "proportional"):
+                    loop_type = "weighted"
+                if loop_type == "weighted":
+                    # bag = weight copies of each row, × nReps, then one shuffle (exact counts)
+                    bag = []
+                    for cond in conds:
+                        try:
+                            w = int(float(cond.get("weight", 1)))
+                        except (TypeError, ValueError):
+                            w = 1
+                        if w < 0:
+                            w = 0
+                        for _ in range(w):
+                            bag.append(dict(cond))
+                    for rep in range(n):
+                        for cond in bag:
+                            schedule.append(dict(cond))
+                    random.shuffle(schedule)
+                    schedule = list(enumerate(schedule))
+                elif loop_type == "fullrandom":
                     for rep in range(n):
                         for ci, cond in enumerate(conds):
                             schedule.append((rep * len(conds) + ci, dict(cond)))
@@ -962,12 +986,28 @@ core.quit()
 '''
 
 
+def _row_weight(cond: Dict[str, Any]) -> int:
+    """Non-negative int weight; missing/invalid → 1; negative → 0."""
+    if not isinstance(cond, dict):
+        return 1
+    raw = cond.get("weight", 1)
+    try:
+        w = int(float(raw))
+    except (TypeError, ValueError):
+        return 1
+    if w < 0:
+        return 0
+    return w
+
+
 def _normalize_loop_type(raw: Any) -> str:
     t = str(raw or "sequential").lower().replace("_", "").replace("-", "")
     if t in ("fullrandom",):
         return "fullrandom"
     if t in ("random",):
         return "random"
+    if t in ("weighted", "weightedrandom", "proportion", "proportional"):
+        return "weighted"
     return "sequential"
 
 
@@ -1000,7 +1040,21 @@ def expand_flow_py(
                     )
             else:
                 schedule: List[tuple] = []
-                if loop_type == "fullrandom":
+                if loop_type == "weighted":
+                    bag: List[Dict[str, Any]] = []
+                    for cond in conds:
+                        if not isinstance(cond, dict):
+                            continue
+                        w = _row_weight(cond)
+                        for _ in range(w):
+                            bag.append(dict(cond))
+                    flat: List[Dict[str, Any]] = []
+                    for rep in range(n):
+                        for cond in bag:
+                            flat.append(dict(cond))
+                    rng.shuffle(flat)
+                    schedule = list(enumerate(flat))
+                elif loop_type == "fullrandom":
                     for rep in range(n):
                         for ci, cond in enumerate(conds):
                             if isinstance(cond, dict):

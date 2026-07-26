@@ -26,7 +26,7 @@ Example (ZH):
 
 ## Multi-subject (one line)
 
-按顺序逐个开跑；正式跑完自动下一号；`P_pilot` 不占正式号。智能体开跑时 `session.experimenter` = AI 身份。
+按顺序逐个开跑；正式跑完自动下一号；`P_pilot` 不占正式号。智能体 / Autopilot 开跑时 `session.experimenter` = **PsyClaw AI**（webui 强制写入 CSV 与名册）。
 
 ## What “done” means (concrete — say these, not codes)
 

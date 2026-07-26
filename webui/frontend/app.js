@@ -278,13 +278,15 @@
                                 }
                               }
                               if (on && label) {
-                                var t = saveBtn && saveBtn === document.activeElement ? saveBtn : (saveAsBtn || saveBtn);
-                                if (t && !t.dataset.lab) {
-                                  t.dataset.lab = t.textContent;
-                                  t.textContent = label;
+                                var tBtn = saveBtn && saveBtn === document.activeElement ? saveBtn : (saveAsBtn || saveBtn);
+                                if (tBtn && !tBtn.dataset.lab) {
+                                  tBtn.dataset.lab = tBtn.textContent;
+                                  tBtn.textContent = label;
                                 }
-                                // Welcome has no file-bar — surface dialog state here
-                                if (!workspaceOpen) {
+                                // Welcome has no file-bar — ONLY when a real folder picker is up
+                                // (label Pick…). Auto-open / Open… must not flash this yellow line.
+                                var isFolderPick = /pick/i.test(String(label || ''));
+                                if (!workspaceOpen && isFolderPick) {
                                   setWelcomeStatus(
                                     'Folder dialog open — folder picker should appear in front (large Explorer dialog). Alt+Tab if hidden. Buttons stay locked until it closes.',
                                     null
@@ -452,7 +454,9 @@
                   if (opts.fromWelcome) setWelcomeStatus(t('welcome.noPath'), 'error');
                   return false;
                 }
-                if (opts.fromWelcome) setWelcomeStatus('Opening… ' + path);
+                // Yellow status only for user-triggered open from Welcome.
+                // Silent auto-open on refresh (opts.auto) — less chrome flash.
+                if (opts.fromWelcome && !opts.auto) setWelcomeStatus('Opening… ' + path);
                 setBusy(true, 'Open…');
                 try {
                   var ok = await openProjectAt(path);
@@ -730,10 +734,8 @@
                                             if (!list.length) return;
                                             var last = list[0];
                                             if (!last || !last.path) return;
-                                            setWelcomeStatus(
-                                              (typeof t === 'function' ? t('welcome.autoOpen', { name: last.name || folderBase(last.path) }) : ('Opening… ' + (last.name || last.path))),
-                                              null
-                                            );
+                                            // Silent auto-open — no yellow busy line on every refresh.
+                                            // Failures still paint red via doOpenAt / setWelcomeStatus.
                                             var ok = await doOpenAt(last.path, { fromWelcome: true, auto: true });
                                             if (!ok && !workspaceOpen) {
                                               // stay on welcome; doOpenAt already surfaces status / drops stale

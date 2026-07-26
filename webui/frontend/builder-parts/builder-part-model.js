@@ -10,6 +10,181 @@ function t(key, vars) {
     return ct.label || ct.type || '';
   }
 
+
+
+  /** Sanitize one path segment for loop names (readable, no codes). */
+  function slugLoopStem(s) {
+    var t = String(s || '')
+      .trim()
+      .replace(/([a-z])([A-Z])/g, '$1_$2')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .replace(/_+/g, '_');
+    // drop empty / pure numeric stems (not meaningful)
+    if (!t || /^[0-9]+$/.test(t)) return '';
+    // strip leading loop_ if user pasted full name
+    if (t.indexOf('loop_') === 0) t = t.slice(5).replace(/^_+/, '');
+    // refuse opaque code-like tails: single letter + digits (b1, a2)
+    if (/^[a-z][0-9]+$/.test(t)) return '';
+    return t.slice(0, 48);
+  }
+
+  function collectLoopNames(nodes, out) {
+    out = out || [];
+    (nodes || []).forEach(function (n) {
+      if (!n) return;
+      if (n.kind === 'loop') {
+        out.push(String(n.name || ''));
+        collectLoopNames(n.children, out);
+      } else if (n.children) {
+        collectLoopNames(n.children, out);
+      }
+    });
+    return out;
+  }
+
+  /**
+   * Default loop.name: always loop_<readable>.
+   * stem from child routine(s); nested → loop_nested_*;
+   * clash → _copy / _followup / _extra (no b1 / x2 codes).
+   */
+  function defaultLoopName(flowRoot, children, opts) {
+    opts = opts || {};
+    var nested = !!opts.nested;
+    var forced = opts.name != null && String(opts.name).trim() !== '' ? String(opts.name).trim() : '';
+    var stem = '';
+    if (forced) {
+      stem = slugLoopStem(forced);
+    } else {
+      var names = [];
+      function firstRoutine(node, depth) {
+        if (!node || depth > 8) return;
+        if (node.routine) {
+          names.push(String(node.routine));
+          return;
+        }
+        if (node.kind === 'loop' && node.children) {
+          for (var i = 0; i < node.children.length && names.length < 2; i++) {
+            firstRoutine(node.children[i], depth + 1);
+          }
+        }
+      }
+      (children || []).forEach(function (ch) { firstRoutine(ch, 0); });
+      if (names.length === 1) {
+        stem = slugLoopStem(names[0]);
+      } else if (names.length >= 2) {
+        var a = slugLoopStem(names[0]);
+        var b = slugLoopStem(names[1]);
+        stem = [a, b].filter(Boolean).join('_');
+      }
+      if (!stem) stem = nested ? 'nested' : 'main';
+      // practice keyword in routine → prefer practice
+      var blob = names.join(' ').toLowerCase();
+      if (!forced && /practice|prac|练习|練習/.test(blob)) stem = 'practice';
+    }
+    if (!stem) stem = nested ? 'nested' : 'main';
+    if (nested && stem !== 'nested' && stem.indexOf('nested_') !== 0 && stem !== 'practice') {
+      stem = 'nested_' + stem;
+    }
+    var base = 'loop_' + stem;
+    var used = {};
+    collectLoopNames(flowRoot || [], []).forEach(function (n) {
+      used[String(n).toLowerCase()] = true;
+    });
+    if (!used[base.toLowerCase()]) return base;
+    // readable clash suffixes — words, not b1/a2
+    var suffixes = ['copy', 'followup', 'extra', 'alt', 'more'];
+    var i, cand;
+    for (i = 0; i < suffixes.length; i++) {
+      cand = base + '_' + suffixes[i];
+      if (!used[cand.toLowerCase()]) return cand;
+    }
+    cand = base + '_copy_again';
+    if (!used[cand.toLowerCase()]) return cand;
+    var n = 2;
+    while (used[(base + '_copy_again_' + n).toLowerCase()]) n++;
+    return base + '_copy_again_' + n;
+  }
+
+
+  /** Stimlist row weight for loopType=weighted. Missing/invalid → 1; negative → 0. */
+  function rowWeight(row) {
+    if (!row || typeof row !== 'object') return 1;
+    if (row.weight === undefined || row.weight === null || row.weight === '') return 1;
+    var n = Number(row.weight);
+    if (!isFinite(n)) return 1;
+    n = Math.floor(n);
+    if (n < 0) return 0;
+    return n;
+  }
+
+  /** Total trials a loop expands to (matches design_compiler). */
+  function loopTrialCount(loop) {
+    if (!loop) return 1;
+    var nR = Number(loop.nReps);
+    if (!isFinite(nR) || nR < 1) nR = 1;
+    nR = Math.floor(nR);
+    var conds = loop.conditions;
+    if (!Array.isArray(conds) || !conds.length) return nR;
+    var lt = String(loop.loopType || 'sequential').toLowerCase().replace(/[_-]/g, '');
+    if (lt === 'weighted' || lt === 'weightedrandom' || lt === 'proportion' || lt === 'proportional') {
+      var sum = 0;
+      for (var i = 0; i < conds.length; i++) sum += rowWeight(conds[i]);
+      return nR * sum;
+    }
+    return nR * conds.length;
+  }
+
+  /** Ensure every conditions row has weight when loopType is weighted. */
+  function ensureWeightColumn(loop) {
+    if (!loop) return;
+    if (!Array.isArray(loop.conditions)) loop.conditions = [];
+    loop.conditions.forEach(function (row) {
+      if (!row || typeof row !== 'object') return;
+      if (row.weight === undefined || row.weight === null || row.weight === '') row.weight = 1;
+    });
+  }
+
+  /**
+   * Word-like preferred column width (ch): max of header + cell text lengths.
+   * Floor/ceiling keep weight compact and long text from blowing the panel.
+   */
+  function condColCharWidths(cols, conditions) {
+    var out = {};
+    (cols || []).forEach(function (c) {
+      var m = String(c || '').length;
+      (conditions || []).forEach(function (row) {
+        if (!row || typeof row !== 'object') return;
+        var s = row[c] == null ? '' : String(row[c]);
+        if (s.length > m) m = s.length;
+      });
+      var floor = c === 'weight' ? 3 : 4;
+      var pad = c === 'weight' ? 1 : 2;
+      out[c] = Math.min(56, Math.max(floor, m + pad));
+    });
+    return out;
+  }
+
+  function applyContentChWidth(el, ch) {
+    if (!el) return;
+    var n = Math.max(1, Math.min(56, Math.floor(Number(ch) || 4)));
+    // Under table-layout:fixed, only size/attr matter — never force minWidth
+    // that steals free space into one column.
+    el.style.width = '100%';
+    el.style.minWidth = '0';
+    el.setAttribute('size', String(n));
+    el.dataset.contentCh = String(n);
+  }
+
+  /** Keep size attr in sync while typing; width stays 100% of cell. */
+  function growInputToContent(inp, floorCh) {
+    if (!inp) return;
+    var floor = Math.max(1, Math.floor(Number(floorCh) || 4));
+    var need = Math.min(56, Math.max(floor, String(inp.value || '').length + 2));
+    applyContentChWidth(inp, need);
+  }
+
   var COMPONENT_TYPES = [
         { type: 'text', labelKey: 'comp.text', label: 'Text', defaults: { text: 'Hello', height: 0.05, color: 'white' } },
         { type: 'keyboard', labelKey: 'comp.keyboard', label: 'Keyboard', defaults: { keys: 'space', force_end: true } },

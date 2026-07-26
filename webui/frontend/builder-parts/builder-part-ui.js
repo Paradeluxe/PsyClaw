@@ -1191,10 +1191,9 @@
                     if (lo === hi && arr[lo] && arr[lo].kind === 'loop' && !meta.bubbleOuter) return { ok: false, meta: meta };
                     var slice = arr.slice(lo, hi + 1);
           var kids = slice.map(function (n) { return JSON.parse(JSON.stringify(n)); });
-          var nameHint = 'trials';
-          var firstR = kids[0] && (kids[0].routine || (kids[0].children && kids[0].children[0] && kids[0].children[0].routine));
-          if (kids.length === 1 && firstR) nameHint = firstR + '_loop';
-          else if (parentPath.length) nameHint = 'inner';
+          var nameHint = defaultLoopName(flowCopy, kids, {
+            nested: !!(parentPath && parentPath.length),
+          });
           var newLoop = {
             kind: 'loop',
             name: nameHint,
@@ -1278,9 +1277,9 @@
                                             var lab = el('span', 'flow-bracket-label', escapeHtml(brInfo.name));
                                             var gR = (isFinite(brInfo.nReps) && brInfo.nReps >= 1) ? brInfo.nReps : 1;
                                             var gC = brInfo.nCond > 0 ? brInfo.nCond : 0;
-                                            var gTotal = gC > 0 ? (gR * gC) : gR;
+                                            var gTotal = brInfo.node ? loopTrialCount(brInfo.node) : (gC > 0 ? (gR * gC) : gR);
                                             var reps = el('span', 'flow-bracket-reps', '\u00d7' + gTotal);
-                                            reps.title = gC > 0 ? (gR + ' reps \u00d7 ' + gC + ' rows = ' + gTotal + ' trials') : (gR + ' reps');
+                                            reps.title = gC > 0 ? (gR + ' reps \u00d7 rows/weights = ' + gTotal + ' trials') : (gR + ' reps');
                                             g.appendChild(lab);
                                             g.appendChild(reps);
                                             if (brInfo.isNew) {
@@ -1580,7 +1579,7 @@
                         var lab = el('span', 'flow-bracket-label', escapeHtml(b.name));
                         var nR = (isFinite(b.nReps) && b.nReps >= 1) ? b.nReps : 1;
                         var nC = (b.nCond > 0) ? b.nCond : 0;
-                        var totalTrials = nC > 0 ? (nR * nC) : nR;
+                        var totalTrials = b.node ? loopTrialCount(b.node) : (nC > 0 ? (nR * nC) : nR);
                         lab.title = (nC > 0
                           ? t('flow.nRepsCond', { n: nR, c: nC, t: totalTrials })
                           : t('flow.nRepsEdit', { n: nR }));
@@ -1597,7 +1596,9 @@
                         var repsLabel = '\u00d7' + totalTrials;
                         var reps = el('span', 'flow-bracket-reps', repsLabel);
                         reps.title = nC > 0
-                          ? (nR + ' reps \u00d7 ' + nC + ' rows = ' + totalTrials + ' trials')
+                          ? ((b.node && String(b.node.loopType || '').toLowerCase() === 'weighted')
+                              ? (nR + ' reps \u00d7 sum(weight) = ' + totalTrials + ' trials')
+                              : (nR + ' reps \u00d7 ' + nC + ' rows = ' + totalTrials + ' trials'))
                           : (nR + ' repetitions');
                         var ux = el('button', 'flow-bracket-x');
                         ux.type = 'button';

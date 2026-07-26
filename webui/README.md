@@ -90,7 +90,7 @@ AI skill writes the marker; this UI runs subjects. Skill install ≠ this GUI.
             No  → stop at marker
             Yes → open this webui / POST /api/runs
                   sequential subjects
-                  when agent drives run: session.experimenter = AI identity
+                  when agent drives run: session.experimenter = PsyClaw AI
                   auto ID / UID; P_pilot free; finished → next ID
 ```
 

@@ -357,6 +357,25 @@ def _register_participant_if_any(
         date = str((sess.get("date") if sess else None) or "")
         pname = str((sess.get("participant_name") if sess else None) or "")
         experimenter = str((sess.get("experimenter") if sess else None) or "")
+        # Belt-and-suspenders: autopilot roster never stores blank experimenter
+        mode_l = str(mode or "").strip().lower()
+        if (
+            not experimenter
+            or mode_l == "autopilot"
+            or pid == "P_autopilot"
+            or pid.startswith("P_autopilot")
+            or bool(getattr(sm, "headless", False))
+        ):
+            # force AI only for autopilot / headless / P_autopilot — not live pilot/start
+            if (
+                mode_l == "autopilot"
+                or pid == "P_autopilot"
+                or pid.startswith("P_autopilot")
+                or (bool(getattr(sm, "headless", False)) and mode_l not in ("pilot", "participant", "run", "start"))
+            ):
+                experimenter = AI_EXPERIMENTER
+                if isinstance(sess, dict):
+                    sess["experimenter"] = experimenter
         _preg.register_run(
             project_path,
             participant_id=pid,
@@ -469,8 +488,10 @@ def system_check() -> Response:
     from system_probe import probe as _probe  # local import keeps boot light
 
     data_path = (request.args.get("path") or "").strip() or None
+    fresh_raw = (request.args.get("fresh") or "").strip().lower()
+    fresh = fresh_raw in ("1", "true", "yes", "y")
     try:
-        report = _probe(RUNS_DIR, data_path=data_path)
+        report = _probe(RUNS_DIR, data_path=data_path, fresh=fresh)
         return jsonify(report)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"ok": False, "overall": "fail", "error": repr(exc), "checks": []}), 500
@@ -909,6 +930,31 @@ def list_runs() -> Response:
     return jsonify({"runs": runs})
 
 
+
+# Canonical experimenter label when agent/Autopilot drives the run (CSV + roster).
+AI_EXPERIMENTER = "PsyClaw AI"
+
+
+def _apply_ai_experimenter(session_obj: dict, mode: str = "", headless: bool = False) -> dict:
+    """Force experimenter=PsyClaw AI for autopilot / P_autopilot / headless agent smoke."""
+    if not isinstance(session_obj, dict):
+        return session_obj
+    pid = str(session_obj.get("participant_id") or "").strip()
+    mode_l = str(mode or "").strip().lower()
+    is_autopilot = (
+        mode_l == "autopilot"
+        or pid == "P_autopilot"
+        or pid.startswith("P_autopilot")
+        or (headless and mode_l in ("", "autopilot"))
+    )
+    # headless without explicit pilot/participant mode → treat as autopilot
+    if headless and mode_l not in ("pilot", "participant", "run", "start"):
+        is_autopilot = True
+    if is_autopilot:
+        session_obj["experimenter"] = AI_EXPERIMENTER
+    return session_obj
+
+
 @api_bp.route("/runs", methods=["POST"])
 def create_run() -> Response:
     if not request.is_json:
@@ -989,6 +1035,16 @@ def create_run() -> Response:
             spec.setdefault("mode", "autopilot")
         else:
             spec.setdefault("mode", (spec.get("mode") or "participant"))
+        # Autopilot / agent headless → experimenter always PsyClaw AI (CSV + roster)
+        if isinstance(spec.get("session"), dict):
+            _apply_ai_experimenter(
+                spec["session"],
+                mode=str(spec.get("mode") or ""),
+                headless=bool(headless_flag),
+            )
+            # keep top-level body session in sync when present
+            if isinstance(body.get("session"), dict):
+                body["session"]["experimenter"] = spec["session"].get("experimenter", "")
         force_dup = bool(body.get("allow_duplicate"))
         mode_now = str(spec.get("mode") or "participant")
         if (

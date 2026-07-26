@@ -94,19 +94,53 @@ def save_registry(project_dir: str, data: Dict[str, Any]) -> None:
     os.replace(tmp, p)
 
 
+AI_EXPERIMENTER = "PsyClaw AI"
+
+
 def list_entries(project_dir: Optional[str]) -> List[Dict[str, Any]]:
     reg = load_registry(project_dir)
     out = []
+    dirty = False
     for e in reg.get("entries") or []:
         if isinstance(e, dict) and e.get("participant_id"):
+            e = dict(e)
             # backfill missing end_status for legacy rows
             if not e.get("end_status"):
-                e = dict(e)
                 e["end_status"] = END_NORMAL
             else:
-                e = dict(e)
                 e["end_status"] = _normalize_end_status(e.get("end_status"))
+            # legacy autopilot rows: blank experimenter → PsyClaw AI
+            pid = str(e.get("participant_id") or "").strip()
+            mode = str(e.get("mode") or "").strip().lower()
+            is_ap = (
+                mode == "autopilot"
+                or pid == "P_autopilot"
+                or pid.startswith("P_autopilot")
+            )
+            exp_now = str(e.get("experimenter") or "").strip()
+            _ai_aliases = {
+                "",
+                "AI assistant",
+                "AI助手",
+                "AI 助手",
+                "PsyClaw-AI",
+                "PsyClaw AI",
+                "Psyclaw AI",
+                "PsyClaw AI",
+            }
+            if is_ap and exp_now in _ai_aliases:
+                if exp_now != AI_EXPERIMENTER:
+                    e["experimenter"] = AI_EXPERIMENTER
+                    dirty = True
             out.append(e)
+    # persist one-shot so roster disk matches UI
+    if dirty and project_dir:
+        try:
+            reg = dict(reg)
+            reg["entries"] = out
+            save_registry(str(project_dir), reg)
+        except Exception:
+            pass
     return out
 
 

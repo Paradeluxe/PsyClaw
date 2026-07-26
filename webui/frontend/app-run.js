@@ -93,6 +93,7 @@
             var pollTimer = null;
             var currentRunId = null;
             var lastArmMode = null;
+            var lastTerminalStatus = null;
             var pollStartTime = null;
             var elapsedTimer = null;
 
@@ -341,11 +342,99 @@
               return 'run';
             }
 
+            /** Best empirical proof from roster: Start > Pilot > Autopilot (normal end only). */
+            function computeLastProvenFromEntries(entries) {
+              var rank = { run: 3, pilot: 2, autopilot: 1 };
+              var best = null;
+              var bestR = 0;
+              (entries || []).forEach(function (e) {
+                if (!e) return;
+                var end = normalizeEndStatus(e.end_status);
+                if (end !== 'normal') return;
+                var m = normalizeRunMode(e.mode);
+                var r = rank[m] || 0;
+                if (r > bestR) {
+                  bestR = r;
+                  best = m;
+                }
+              });
+              return best;
+            }
+
+            function pushLastProven(modeOrNull) {
+              try {
+                if (window.PsyClawSystem && typeof window.PsyClawSystem.setLastProven === 'function') {
+                  window.PsyClawSystem.setLastProven(modeOrNull);
+                }
+              } catch (eLP) { /* ignore */ }
+            }
+
+            function isAiExperimenter(name) {
+              var s = String(name || '').trim();
+              if (!s) return false;
+              var low = s.toLowerCase();
+              return (
+                s === 'PsyClaw AI' ||
+                s === 'PsyClaw AI' ||
+                s === 'PsyClaw-AI' ||
+                s === 'AI assistant' ||
+                s === 'AI助手' ||
+                (low.indexOf('psyclaw') >= 0 && low.indexOf('ai') >= 0)
+              );
+            }
+
+            /** Roster / session: label + small robot when AI experimenter */
+            function formatExperimenterCell(name) {
+              var s = String(name || '').trim();
+              if (!s) return escHtml('—');
+              if (!isAiExperimenter(s)) return escHtml(s);
+              var label = 'PsyClaw AI';
+              return (
+                '<span class="run-exp-ai" title="' + escHtml(label) + '">' +
+                  '<span class="run-exp-ai-label">' + escHtml(label) + '</span>' +
+                  '<span class="run-exp-ai-icon" aria-hidden="true">' +
+                    '<svg class="run-exp-robot" viewBox="0 0 16 16" width="18" height="18" focusable="false">' +
+                      '<rect x="4" y="5" width="8" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.25"/>' +
+                      '<rect x="6.5" y="2" width="3" height="3" rx="0.6" fill="currentColor"/>' +
+                      '<circle cx="6.5" cy="8" r="1" fill="currentColor"/>' +
+                      '<circle cx="9.5" cy="8" r="1" fill="currentColor"/>' +
+                      '<path d="M3 8h1.2M11.8 8H13" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>' +
+                      '<path d="M6 12.5h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>' +
+                    '</svg>' +
+                  '</span>' +
+                '</span>'
+              );
+            }
+
             function formatRunMode(m) {
               var n = normalizeRunMode(m);
               if (n === 'pilot') return t('run.modePilot');
               if (n === 'autopilot') return t('run.modeAutopilot');
               return t('run.modeRun');
+            }
+
+            function statusLabel(status) {
+              var map = {
+                starting: 'run.statusStarting',
+                compiling: 'run.statusCompiling',
+                compiled: 'run.statusCompiling',
+                running: 'run.statusRunning',
+                stopped: 'run.statusStopped',
+                failed: 'run.statusFailed',
+                finished: 'run.statusFinished',
+                error: 'run.statusFailed',
+              };
+              var key = map[status];
+              if (!key) return String(status || '—');
+              try {
+                var loc = t(key);
+                if (loc && loc !== key) return loc;
+              } catch (eSL) { /* fall */ }
+              return String(status || '—');
+            }
+
+            function formatFlightStatus(mode, status) {
+              return formatRunMode(mode || 'participant') + ' · ' + statusLabel(status);
             }
 
             loadExtraFields();
@@ -371,6 +460,11 @@
                                                   if (!rosterBody) return;
                                                   // Show ALL modes (run/pilot/autopilot). Prefer entries over production-only used.
                                                   var used = (data && (data.entries || data.used)) || [];
+                                                  // Badge empirical ladder (Start > Pilot > Autopilot)
+                                                  try {
+                                                    if (!data) pushLastProven(null);
+                                                    else pushLastProven(computeLastProvenFromEntries(used));
+                                                  } catch (eProv) { /* ignore */ }
                                                   used = used.filter(function (e) { return !!e; });
                                                   used = used.slice().sort(function (a, b) {
                                                     return String(b.at || b.date || '').localeCompare(String(a.at || a.date || ''));
@@ -434,7 +528,7 @@
                                                       '<tr data-pid="' + escHtml(pid) + '" data-session="' + escHtml(sess) + '" data-mode="' + escHtml(modeRaw) + '">' +
                                                       '<td>' + escHtml(pid) + '</td>' +
                                                       '<td>' + escHtml(e.participant_name || '—') + '</td>' +
-                                                      '<td>' + escHtml(e.experimenter || '—') + '</td>' +
+                                                      '<td class="run-roster-exp">' + formatExperimenterCell(e.experimenter) + '</td>' +
                                                       '<td>' + escHtml(sess) + '</td>' +
                                                       '<td>' + escHtml(when) + '</td>' +
                                                       '<td class="run-roster-mode"><span class="run-mode-chip mode-' + escHtml(modeNorm) + '">' +
@@ -615,6 +709,7 @@
                           if (!path) {
                             setParticipantHint(t('run.rosterNeedProject'), false);
                             renderRoster(null);
+                            pushLastProven(null);
                             if (opts.assignNext) setLockedParticipantId('P01');
                             return null;
                           }
@@ -764,7 +859,13 @@
           dateEl.textContent = sess.date || '—';
           if (uidTxt) dateEl.setAttribute('title', 'uid ' + uidTxt);
         }
-        if (expEl) expEl.textContent = sess.experimenter || '—';
+        if (expEl) {
+          if (typeof isAiExperimenter === 'function' && isAiExperimenter(sess.experimenter)) {
+            expEl.innerHTML = formatExperimenterCell(sess.experimenter);
+          } else {
+            expEl.textContent = sess.experimenter || '—';
+          }
+        }
         if (fps) {
           var f = instr.fps_hz;
           var extra = '';
@@ -1028,9 +1129,33 @@
 
       function setStatus(status) {
         if (!statusBadge) return;
-        statusBadge.textContent = status;
-        statusBadge.className = 'status-badge status-' + status;
         var running = (status === 'running' || status === 'starting' || status === 'compiling' || status === 'compiled');
+        var idleish = !status || status === 'idle' || status === 'ready' || status === 'ready to compile';
+        var terminal = (status === 'finished' || status === 'failed' || status === 'stopped' || status === 'error');
+        if (terminal) lastTerminalStatus = status;
+        if (running) lastTerminalStatus = null;
+        if (idleish && !running) {
+          statusBadge.removeAttribute('data-flight');
+          statusBadge.removeAttribute('data-run-status');
+          try {
+            if (window.PsyClawSystem && typeof window.PsyClawSystem.paintRunGate === 'function') {
+              window.PsyClawSystem.paintRunGate();
+            } else {
+              statusBadge.textContent = status || '—';
+              statusBadge.className = 'status-badge status-idle';
+            }
+          } catch (eG) {
+            statusBadge.textContent = status || '—';
+            statusBadge.className = 'status-badge status-idle';
+          }
+        } else {
+          statusBadge.setAttribute('data-flight', running ? '1' : '0');
+          statusBadge.setAttribute('data-run-status', status || '');
+          var modeNorm = normalizeRunMode(lastArmMode || 'participant');
+          statusBadge.textContent = formatFlightStatus(lastArmMode, status);
+          statusBadge.className = 'status-badge status-' + status + ' mode-' + modeNorm;
+          statusBadge.title = statusBadge.textContent;
+        }
         // After finished/stopped/failed: Start re-enabled (no Reset button)
         startBtn.disabled = running;
                 var pilotBtn = document.getElementById('pilot-run-btn');
@@ -1038,8 +1163,13 @@
                 var autopilotBtn = document.getElementById('autopilot-run-btn');
                 if (autopilotBtn) autopilotBtn.disabled = running;
                 stopBtn.disabled = (!running);
-        if (downloadBtn) downloadBtn.disabled = (status !== 'finished');
-        if (downloadPackBtn) downloadPackBtn.disabled = (status !== 'finished');
+        // Downloads follow last finished terminal, not idle badge after paintRunGate.
+        var dlOk = (!running && lastTerminalStatus === 'finished');
+        if (downloadBtn) downloadBtn.disabled = !dlOk;
+        if (downloadPackBtn) downloadPackBtn.disabled = !dlOk;
+        if (!running && status && !idleish) {
+          statusBadge.setAttribute('data-flight', '0');
+        }
       }
 
       function tickElapsed() {
@@ -1103,6 +1233,25 @@
                 ' mode=' + (meta.mode || '?'));
             }
             if (d.status === 'finished') {
+                                                  // Empirical proof for badge (only normal finish)
+                                                  try {
+                                                    var finMode = normalizeRunMode(
+                                                      (d.instrument && d.instrument.mode) ||
+                                                      (d.spec && d.spec.mode) ||
+                                                      lastArmMode ||
+                                                      'participant'
+                                                    );
+                                                    var curP = null;
+                                                    try {
+                                                      if (window.PsyClawSystem && window.PsyClawSystem.getLastProven) {
+                                                        curP = window.PsyClawSystem.getLastProven();
+                                                      }
+                                                    } catch (eGP) { curP = null; }
+                                                    var rank = { run: 3, pilot: 2, autopilot: 1 };
+                                                    if (!curP || (rank[finMode] || 0) >= (rank[curP] || 0)) {
+                                                      pushLastProven(finMode);
+                                                    }
+                                                  } catch (eFinP) { /* ignore */ }
                                                   var dataHint = '';
                                                   if (d.instrument) {
                                                     var csvFull = d.instrument.csv_project || d.instrument.csv || '';
@@ -1123,8 +1272,10 @@
                                                   } else {
                                                     goNextParticipant();
                                                   }
+                                                  // Normal finish → restore idle Last status: Mode (proven already pushed).
+                                                  setStatus('idle');
                                                 } else {
-                                                  // stopped (ESC / Stop) or failed — keep ID, show manual/unexpected chip
+                                                  // stopped (ESC / Stop) or failed — keep ID, show mode · terminal (no proven lift)
                                                   refreshParticipantSuggest({ assignNext: false });
                                                 }
                         stopPolling();
@@ -1254,6 +1405,9 @@
                   session.participant_id = 'P_pilot';
                 } else if (isAutopilot) {
                   session.participant_id = 'P_autopilot';
+                  // Agent/smoke path — always record experimenter as PsyClaw AI
+                  session.experimenter = 'PsyClaw AI';
+                  if (elExp) elExp.value = 'PsyClaw AI';
                 }
 
                 // Cap loops only for autopilot (auto key simulation smoke)

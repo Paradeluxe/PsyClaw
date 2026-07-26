@@ -12,6 +12,7 @@
 
   var lastSystemSnapshot = null;
   var systemCheckGen = 0;
+  var systemCheckInFlight = false;
   var lastDiskPathKey = null;
 
     // System / hardware checks
@@ -86,16 +87,6 @@
       status: w >= 1024 && h >= 768 ? 'pass' : 'warn',
       detail: w + '×' + h + ' · dpr ' + dpr + ' · ' + depth + 'bit',
       value: { w: w, h: h, dpr: dpr, colorDepth: depth },
-    });
-
-    var fsOk = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
-    out.push({
-      id: 'fullscreen_api',
-      label: 'Fullscreen API',
-      group: 'hardware',
-      status: fsOk ? 'pass' : 'warn',
-      detail: fsOk ? 'supported (participant path)' : 'not available',
-      value: fsOk,
     });
 
     var audioOk = !!(window.AudioContext || window.webkitAudioContext);
@@ -212,12 +203,15 @@
 
   function _summarizeInputs(list) {
     list = list || [];
-    if (!list.length) return { text: t('sys.notDetected'), conn: 'other', multi: false, title: '', empty: true };
+    if (!list.length) {
+      return { text: t('sys.notDetected'), conn: 'other', multi: false, title: '', empty: true, status: 'info' };
+    }
     function isVirtual(d) {
       var s = ((d && d.instance_id) || '') + ' ' + ((d && d.name) || '');
       return /GVINPUT|GameViewer|AskLink|VIRTUAL|RDP|VMware|vhid/i.test(s);
     }
     var real = list.filter(function (d) { return !isVirtual(d); });
+    var onlyVirtual = !real.length && list.length > 0;
     var pool = real.length ? real : list;
     var ranked = pool.slice().sort(function (a, b) {
       var order = { bluetooth: 0, usb: 1, ps2: 2, 'built-in': 3, other: 4 };
@@ -238,17 +232,27 @@
       var n = String(d.name || '').trim();
       if (n && names.indexOf(n) < 0 && names.length < 2) names.push(n);
     });
-    var text = _connLabel(conn);
-    if (names.length) text += ' · ' + names.join(' / ');
+    // Same face as Mic/Speaker: names joined with · ; connection in title + prefix when useful
+    var text = names.length ? names.join(' · ') : _connLabel(conn);
+    if (names.length && conn && conn !== 'other') {
+      text = _connLabel(conn) + ' · ' + text;
+    }
+    var nExtra = ranked.length - names.length;
+    if (nExtra > 0 && names.length) text += ' (+' + nExtra + ')';
     var nConn = Object.keys(conns).length;
     if (nConn > 1) text += ' (+' + (nConn - 1) + ' more)';
+    var st = onlyVirtual ? 'warn' : 'pass';
+    var titleBits = ranked.map(function (d) {
+      return _connLabel(d.connection) + ': ' + (d.name || '?');
+    });
+    if (onlyVirtual) titleBits.push('(virtual only)');
     return {
       text: text,
       conn: conn,
-      multi: names.length > 1,
-      title: ranked.map(function (d) {
-        return _connLabel(d.connection) + ': ' + (d.name || '?');
-      }).join('\n'),
+      multi: names.length > 1 || ranked.length > 1,
+      title: titleBits.join('\n'),
+      empty: false,
+      status: st,
     };
   }
 
@@ -258,19 +262,25 @@
     list = list || [];
     function isVirt(d) {
       if (d && d.virtual) return true;
-      var s = String((d && (d.name || d.label)) || '') + ' ' + String((d && d.instance_id) || '');
-      return /VIRTUAL|VB-AUDIO|CABLE INPUT|CABLE OUTPUT|STEREO MIX|WHAT U HEAR|NVIDIA VIRTUAL|\bBROADCAST\b/i.test(s);
+      var s = String((d && (d.name || d.label)) || '') + ' ' + String((d && d.instance_id) || '') + ' ' + String((d && d.deviceId) || '');
+      return /VIRTUAL|VB-?AUDIO|CABLE\s*INPUT|CABLE\s*OUTPUT|STEREO\s*MIX|WHAT\s*U\s*HEAR|NVIDIA\s*VIRTUAL|NVIDIA\s*BROADCAST|\bBROADCAST\b|DEFAULT\s*-|COMMUNICATIONS\s*-/i.test(s);
+    }
+    function isGenericMicLabel(d) {
+      var n = String((d && (d.name || d.label)) || '').trim();
+      // Browser placeholders before permission / bare defaults — not proof of hardware
+      return !n || /^(microphone|mic|麦克风|unnamed|default)$/i.test(n);
     }
     function statusOk(d) {
       var st = String((d && d.status) || '').toUpperCase();
-      // browser lists have no status → treat as ok; host Unknown ≈ unplugged endpoint
+      // browser lists have no status → ok unless host said unplugged/disabled
       if (!st) return true;
-      return st === 'OK' || st === 'STARTED';
+      if (st === 'OK' || st === 'STARTED' || st === 'ACTIVE') return true;
+      return false; // Unplugged / NotPresent / Disabled / Unknown
     }
     var okPool = list.filter(statusOk);
     var pool = okPool.length ? okPool : [];
-    var real = pool.filter(function (d) { return !isVirt(d); });
-    var use = real.length ? real : pool;
+    var real = pool.filter(function (d) { return !isVirt(d) && !isGenericMicLabel(d); });
+    var use = real.length ? real : pool.filter(function (d) { return !isGenericMicLabel(d); });
     var names = [];
     use.forEach(function (d) {
       var n = String((d && (d.name || d.label)) || '').trim();
@@ -282,12 +292,12 @@
     var text = names.slice(0, 2).join(' · ');
     if (names.length > 2) text += ' (+' + (names.length - 2) + ')';
     var driverOnly = use.every(function (d) { return d && d.source === 'driver'; });
-    var onlyVirtual = !real.length && pool.length > 0;
+    var onlyVirtual = !real.length && use.length > 0;
     // pass = at least one real OK endpoint; warn = driver-only or virtual-only
     var st = (driverOnly || onlyVirtual) ? 'warn' : 'pass';
     var titleBits = names.slice();
     if (driverOnly) titleBits.push('(sound driver — not a playback endpoint)');
-    if (onlyVirtual) titleBits.push('(virtual only)');
+    if (onlyVirtual) titleBits.push('(virtual only — no physical microphone)');
     return {
       text: text,
       empty: false,
@@ -298,7 +308,122 @@
     };
   }
 
-  function _checkById(checks, id) {
+
+  function _monConnLabel(c) {
+    c = String(c || '').toLowerCase();
+    if (c === 'hdmi') return 'HDMI';
+    if (c === 'displayport' || c === 'dp') return 'DisplayPort';
+    if (c === 'dvi') return 'DVI';
+    if (c === 'vga') return 'VGA';
+    if (c === 'internal') return 'Internal';
+    if (c === 'miracast' || c === 'wireless') return 'Wireless';
+    return '';
+  }
+
+  /** Per-monitor trust: backend trust field, with client-side safety net. */
+  function _monitorTrust(m) {
+    m = m || {};
+    var t0 = String(m.trust || '').toLowerCase();
+    if (t0 === 'real' || t0 === 'geometry' || t0 === 'virtual' || t0 === 'unknown') return t0;
+    var nm = String(m.name || '').trim();
+    var blob = [nm, m.label, m.manufacturer, m.device, m.instance, m.connection].join(' ');
+    if (m.virtual || /virtual|mirror|rdp|vmware|vbox|hyper-?v|parsec|sunshine|idd_|basicrender|citrix/i.test(blob)) {
+      return 'virtual';
+    }
+    if (String(m.connection || '').toLowerCase() === 'miracast') return 'virtual';
+    if (String(m.source || '').toLowerCase() === 'edid' && nm && !m.generic) return 'real';
+    if (nm && !/^(generic|default\s+monitor)/i.test(nm) && !/pnp monitor/i.test(nm) && !m.generic) return 'real';
+    if ((m.width && m.height) || String(m.source || '') === 'geometry') return 'geometry';
+    return 'unknown';
+  }
+
+  /** Monitor list → text + pass/warn. Pass if ≥1 real; virtual-only/geometry-only → warn. */
+  function _summarizeMonitors(list, browserDetail, refreshHz) {
+    list = list || [];
+    if (!list.length) {
+      var fb = browserDetail || '';
+      if (fb && fb !== '—' && fb !== '\u2014') {
+        return {
+          text: fb + (refreshHz && refreshHz !== '—' && refreshHz !== '\u2014' ? (' \u00b7 ' + refreshHz) : ''),
+          empty: false,
+          multi: false,
+          title: 'Browser screen only (no host EDID)',
+          status: 'warn',
+        };
+      }
+      return { text: t('sys.notDetected') || 'Not detected', empty: true, multi: false, title: '', status: 'info' };
+    }
+    // Prefer real panels in the visible line
+    var ranked = list.slice().sort(function (a, b) {
+      var _rank = { real: 0, geometry: 1, unknown: 2, virtual: 3 };
+      var ra = _rank[_monitorTrust(a)]; if (ra == null) ra = 9;
+      var rb = _rank[_monitorTrust(b)]; if (rb == null) rb = 9;
+      if (ra !== rb) return ra - rb;
+      return (b.primary ? 1 : 0) - (a.primary ? 1 : 0);
+    });
+    var parts = [];
+    var titles = [];
+    var nReal = 0, nVirt = 0, nGeom = 0, nUnk = 0;
+    for (var i = 0; i < ranked.length; i++) {
+      var m = ranked[i] || {};
+      var trust = _monitorTrust(m);
+      if (trust === 'real') nReal++;
+      else if (trust === 'virtual') nVirt++;
+      else if (trust === 'geometry') nGeom++;
+      else nUnk++;
+      var wh = (m.width && m.height) ? (m.width + '\u00d7' + m.height) : '';
+      var nm = String(m.name || '').trim();
+      var lab = String(m.label || '').trim();
+      if (!lab) {
+        lab = nm || ('Monitor ' + ((m.index != null ? Number(m.index) : i) + 1));
+        if (m.primary && lab.indexOf('Primary') < 0) lab += ' \u00b7 Primary';
+      }
+      var conn = _monConnLabel(m.connection);
+      if (trust === 'virtual' && !conn) conn = 'Virtual';
+      var bit = [lab, wh].filter(Boolean).join(' ');
+      if (conn && bit.indexOf(conn) < 0) bit += ' \u00b7 ' + conn;
+      parts.push(bit);
+      var tbits = [lab, wh, conn || m.connection, m.manufacturer, m.device, m.serial, 'trust=' + trust].filter(Boolean);
+      if (m.width_cm && m.height_cm) tbits.push(m.width_cm + 'cm\u00d7' + m.height_cm + 'cm');
+      if (m.evidence) tbits.push('evidence=' + m.evidence);
+      if (trust === 'virtual') tbits.push('(virtual display)');
+      if (trust === 'geometry') tbits.push('(geometry only — no EDID product name)');
+      titles.push(tbits.join(' \u00b7 '));
+    }
+    var text = parts.slice(0, 2).join(' \u00b7 ');
+    if (parts.length > 2) text += ' \u00b7 +' + (parts.length - 2);
+    if (refreshHz && refreshHz !== '—' && refreshHz !== '\u2014' && text.indexOf('Hz') < 0) {
+      text = text + ' \u00b7 ' + refreshHz;
+    }
+    // Gate: need at least one real panel for Pass
+    var st = 'pass';
+    var reason = '';
+    if (nReal > 0) {
+      st = 'pass';
+      if (nVirt > 0) reason = nReal + ' real + ' + nVirt + ' virtual';
+    } else if (nVirt > 0 && nGeom === 0) {
+      st = 'warn';
+      reason = 'virtual display only';
+    } else if (nGeom > 0 || nUnk > 0) {
+      st = 'warn';
+      reason = 'no EDID product name (geometry/browser only)';
+    } else {
+      st = 'info';
+      reason = 'not detected';
+    }
+    var title = titles.join('\n');
+    if (reason) title = title ? (title + '\n' + reason) : reason;
+    return {
+      text: text,
+      empty: false,
+      multi: parts.length > 1,
+      title: title,
+      status: st,
+    };
+  }
+
+
+    function _checkById(checks, id) {
     for (var i = 0; i < (checks || []).length; i++) {
       if (checks[i] && checks[i].id === id) return checks[i];
     }
@@ -328,6 +453,31 @@
           (title ? ' title="' + _escHtml(title) + '"' : '') + '>' +
           vHtml +
         '</div>' +
+      '</div>'
+    );
+  }
+
+  /** I/O row with inline path-test control (KB / Mouse / Speaker). */
+  function _ioTestHtml(btnId, resultId, btnLabel) {
+    return (
+      '<div class="sys-io-test">' +
+        '<button type="button" class="btn btn-secondary sys-io-test-btn" id="' + _escHtml(btnId) + '">' +
+          _escHtml(btnLabel) +
+        '</button>' +
+        '<span class="sys-io-test-result" id="' + _escHtml(resultId) + '"></span>' +
+      '</div>'
+    );
+  }
+
+  function _infoRowTest(k, vHtml, multi, title, testHtml) {
+    return (
+      '<div class="sys-info-row sys-info-row-test">' +
+        '<div class="sys-info-k">' + _escHtml(k) + '</div>' +
+        '<div class="sys-info-v' + (multi ? ' is-multi' : '') + '"' +
+          (title ? ' title="' + _escHtml(title) + '"' : '') + '>' +
+          vHtml +
+        '</div>' +
+        (testHtml || '') +
       '</div>'
     );
   }
@@ -478,27 +628,245 @@
     n.btn.classList.toggle('is-busy', !!busy);
   }
 
-  function paintGate(gate, metaText) {
+  /** Last host gate — Run badge reads this when idle (not mid-flight). */
+  var lastRunGate = null;
+  /** Best proven live run for open project: run > pilot > autopilot (normal end only). */
+  var lastProvenMode = null;
+  /** Env fingerprint at last successful probe; drift → stale. */
+  var probeEnvFp = null;
+  var systemStale = false;
+  var systemStaleReason = '';
+  var _envDriftTimer = null;
+
+  function hostEnvFingerprint() {
+    var parts = [];
+    try {
+      if (window.screen) {
+        parts.push(
+          's:' + screen.width + 'x' + screen.height +
+          '@' + (screen.colorDepth || 0)
+        );
+        if (screen.availWidth != null) {
+          parts.push('a:' + screen.availWidth + 'x' + screen.availHeight);
+        }
+      }
+    } catch (e0) { /* ignore */ }
+    try {
+      parts.push('dpr:' + String(window.devicePixelRatio || 1));
+    } catch (e1) { /* ignore */ }
+    try {
+      var od = window.screen && screen.orientation && screen.orientation.type;
+      if (od) parts.push('o:' + od);
+    } catch (e2) { /* ignore */ }
+    return parts.join('|');
+  }
+
+  function markProbeEnvBaseline() {
+    probeEnvFp = hostEnvFingerprint();
+    systemStale = false;
+    systemStaleReason = '';
+  }
+
+  function checkEnvDrift() {
+    if (!probeEnvFp) return false;
+    var now = hostEnvFingerprint();
+    if (now === probeEnvFp) return false;
+    if (!systemStale) {
+      systemStale = true;
+      systemStaleReason = 'display';
+      try {
+        var g = lastRunGate || (lastSystemSnapshot && lastSystemSnapshot.gate);
+        if (g && !g.checking) {
+          paintRunStatusGate(g, lastSystemSnapshot && lastSystemSnapshot.counts);
+        }
+      } catch (eRep) { /* ignore */ }
+    }
+    return true;
+  }
+
+  function scheduleEnvDriftCheck() {
+    if (_envDriftTimer) clearTimeout(_envDriftTimer);
+    _envDriftTimer = setTimeout(function () {
+      _envDriftTimer = null;
+      checkEnvDrift();
+    }, 450);
+  }
+
+  function forceSystemStale(reason) {
+    if (!probeEnvFp) return;
+    if (systemStale && systemStaleReason === reason) return;
+    systemStale = true;
+    systemStaleReason = reason || 'env';
+    try {
+      var g = lastRunGate || (lastSystemSnapshot && lastSystemSnapshot.gate);
+      if (g && !g.checking) {
+        paintRunStatusGate(g, lastSystemSnapshot && lastSystemSnapshot.counts);
+      }
+    } catch (eFS) { /* ignore */ }
+  }
+
+  function wireEnvDriftWatchers() {
+    try {
+      window.addEventListener('resize', scheduleEnvDriftCheck);
+    } catch (eR) { /* ignore */ }
+    try {
+      if (window.screen && screen.orientation && screen.orientation.addEventListener) {
+        screen.orientation.addEventListener('change', scheduleEnvDriftCheck);
+      }
+    } catch (eO) { /* ignore */ }
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+        // device list not in screen fingerprint — force stale on plug/unplug
+        navigator.mediaDevices.addEventListener('devicechange', function () {
+          forceSystemStale('device');
+        });
+      }
+    } catch (eM) { /* ignore */ }
+    try {
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') scheduleEnvDriftCheck();
+      });
+    } catch (eV) { /* ignore */ }
+  }
+
+  function formatLastProven(mode) {
+    if (!mode) return '';
+    var m = String(mode).toLowerCase();
+    try {
+      if (m === 'run' || m === 'participant') return t('run.gateLastStart') || 'Last status: Start';
+      if (m === 'pilot') return t('run.gateLastPilot') || 'Last status: Pilot';
+      if (m === 'autopilot') return t('run.gateLastAutopilot') || 'Last status: Autopilot';
+    } catch (eF) { /* fall */ }
+    if (m === 'run' || m === 'participant') return 'Last status: Start';
+    if (m === 'pilot') return 'Last status: Pilot';
+    if (m === 'autopilot') return 'Last status: Autopilot';
+    return '';
+  }
+
+  function setLastProvenMode(mode) {
+    var next = null;
+    if (mode) {
+      var s = String(mode).trim().toLowerCase();
+      if (s === 'participant' || s === 'run' || s === 'start') next = 'run';
+      else if (s === 'pilot') next = 'pilot';
+      else if (s === 'autopilot') next = 'autopilot';
+    }
+    lastProvenMode = next;
+    if (!isRunFlightActive()) {
+      try {
+        var g = lastRunGate || (lastSystemSnapshot && lastSystemSnapshot.gate);
+        if (g && !g.checking) {
+          paintRunStatusGate(g, lastSystemSnapshot && lastSystemSnapshot.counts);
+        }
+      } catch (eP) { /* ignore */ }
+    }
+  }
+
+  function isRunFlightActive() {
+    try {
+      var b = document.getElementById('run-status-badge');
+      if (!b) return false;
+      if (b.getAttribute('data-flight') === '1') return true;
+      var st = b.getAttribute('data-run-status') || '';
+      return /^(starting|compiling|compiled|running)$/i.test(st);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function formatGateProgress(counts) {
+    counts = counts || {};
+    var p = counts.pass || 0;
+    var w = counts.warn || 0;
+    var f = counts.fail || 0;
+    try {
+      if (typeof t === 'function') {
+        return t('run.gateProgress', { pass: p, warn: w, fail: f });
+      }
+    } catch (e0) { /* fall */ }
+    return p + ' pass · ' + w + ' warn · ' + f + ' fail';
+  }
+
+  /** Gate + check progress → #run-status-badge (Recheck button stays action-only). */
+  function paintRunStatusGate(gate, counts) {
+    var badge = document.getElementById('run-status-badge');
+    if (!badge) return;
+    if (isRunFlightActive()) {
+      if (gate && !gate.checking) lastRunGate = gate;
+      return;
+    }
+    if (!gate || gate.checking) {
+      badge.textContent = t('run.gateChecking') || t('sys.checking') || 'Checking…';
+      badge.className = 'status-badge status-idle gate-checking';
+      badge.setAttribute('data-gate', 'checking');
+      badge.removeAttribute('data-run-status');
+      badge.removeAttribute('data-proven');
+      badge.removeAttribute('data-stale');
+      badge.title = t('sys.probing') || '';
+      return;
+    }
+    lastRunGate = gate;
+        var label = gate.label || '—';
+        // Minimalist main line: Last status: Mode. Color = last proven mode; block overrides red.
+        var provenTxt = formatLastProven(lastProvenMode);
+        var main = provenTxt || (t('run.gateLastNone') || 'Last status: —');
+        var bits = [main];
+        if (systemStale) {
+          bits.push(t('run.gateStaleShort') || 'stale');
+        }
+        badge.textContent = bits.join(' · ');
+        var lvl = gate.level || gate.css || 'run';
+        if (lvl === 'pass') lvl = 'run';
+        if (lvl === 'warn') lvl = 'pilot';
+        if (lvl === 'fail') lvl = 'block';
+        var modeKey = lastProvenMode || 'none';
+        // Color = last proven mode. Only real block keeps gate-block (red override).
+        var cls = 'status-badge status-idle last-mode-' + modeKey;
+        if (lvl === 'block') cls += ' gate-block';
+        if (systemStale) cls += ' gate-stale';
+        badge.className = cls;
+        badge.setAttribute('data-gate', lvl);
+        if (lastProvenMode) badge.setAttribute('data-proven', lastProvenMode);
+        else badge.removeAttribute('data-proven');
+        if (systemStale) badge.setAttribute('data-stale', '1');
+        else badge.removeAttribute('data-stale');
+        badge.removeAttribute('data-run-status');
+        var titleBits = [];
+        titleBits.push(label);
+        if (gate.reason && gate.reason !== label) titleBits.push(gate.reason);
+        titleBits.push(main);
+        if (systemStale) {
+          titleBits.push(t('run.gateStale') || 'Host may have changed — Recheck');
+        }
+        badge.title = titleBits.join(' · ');
+      }
+
+  function paintGate(gate, metaText, counts) {
       var n = summaryNodes();
       var metaInline = document.getElementById('sys-meta-inline');
       var gateWrap = document.getElementById('sys-gate');
-      // Chip only; reason on chip title tooltip (no second line).
+      // Recheck button = action only (not Pilot/Ready label).
       if (n.btn) {
         if (!gate || gate.checking) {
-          if (n.label) n.label.textContent = t('sys.checking');
+          if (n.label) n.label.textContent = t('sys.recheckBusy') || t('sys.checking') || 'Checking…';
           n.btn.className = 'sys-summary status-idle is-checking';
-          n.btn.title = t('sys.probing');
+          n.btn.title = t('sys.probing') || t('sys.recheckHint');
           setSummaryBusy(true);
         } else {
-          if (n.label) n.label.textContent = gate.label || '—';
+          if (n.label) n.label.textContent = t('sys.recheck') || 'Recheck';
           n.btn.className = 'sys-summary status-' + (gate.css || 'idle');
-          var reason = gate.reason || gate.label || '';
-          n.btn.title = reason
-            ? (reason + ' · ' + t('sys.recheckHint'))
-            : t('sys.recheckHint');
+          n.btn.title = t('sys.recheckHint');
           setSummaryBusy(false);
         }
       }
+      var c = counts;
+      if (!c && lastSystemSnapshot && lastSystemSnapshot.counts) c = lastSystemSnapshot.counts;
+      // Successful probe snapshot → reset env baseline (clears stale).
+      if (gate && !gate.checking) {
+        markProbeEnvBaseline();
+      }
+      paintRunStatusGate(gate, c);
+
       if (gateWrap) {
         var lvl = (gate && gate.level) || (gate && gate.checking ? 'checking' : '');
         gateWrap.dataset.level = lvl || '';
@@ -601,48 +969,35 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
 
         var kb = _summarizeInputs(hw.keyboards);
         var mouse = _summarizeInputs(hw.mice);
-        var micList = (hw.microphones && hw.microphones.length) ? hw.microphones : lastHostMics;
+        // Host microphones[] is authority (incl. empty = no capture endpoint).
+        // Do not fall back to browser lists when probe returned the field.
+        var micList = Array.isArray(hw.microphones) ? hw.microphones : lastHostMics;
         var mic = _summarizeNameDevices(micList, 'builder.ioMicNone');
         var spk = _summarizeNameDevices(hw.speakers || [], 'builder.ioSpkNone');
         var audio = _checkById(checks, 'audio_api'); // still feed I/O cards
 
-        // Monitor row: host probe list → label + W×H; fallback browser display + refresh
+        // Monitor row: EDID name + geometry + connection; pass/warn like Speaker
         var mons = hw.monitors || [];
-        var monParts = [];
-        var monTitleParts = [];
-        var mi;
-        for (mi = 0; mi < mons.length; mi++) {
-          var m = mons[mi] || {};
-          var wh = (m.width && m.height) ? (m.width + '\u00d7' + m.height) : '';
-          var mlab = String(m.label || '').trim();
-          if (!mlab) {
-            mlab = 'Monitor ' + ((m.index != null ? Number(m.index) : mi) + 1);
-            if (m.primary) mlab += ' \u00b7 Primary';
-          }
-          monParts.push([mlab, wh].filter(Boolean).join(' '));
-          monTitleParts.push([mlab, wh, m.device || ''].filter(Boolean).join(' \u00b7 '));
-        }
-        var monText = monParts.slice(0, 2).join(' \u00b7 ') || disp || '\u2014';
-        if (monParts.length > 2) monText += ' \u00b7 +' + (monParts.length - 2);
-        var monTitle = monTitleParts.join(' \u00b7 ') || [disp, refresh].filter(function (x) {
-          return x && x !== '\u2014';
-        }).join(' \u00b7 ') || monText;
-        if (refresh && refresh !== '\u2014' && monText.indexOf('Hz') < 0) {
-          monText = monText === '\u2014' ? refresh : (monText + ' \u00b7 ' + refresh);
-        }
+        var monSum = _summarizeMonitors(mons, disp, refresh);
+        var monText = monSum.text;
+        var monTitle = monSum.title || monText;
 
-        // Input: KB/Mouse (conn) + Mic/Speaker + Monitor
+        // Input status only (path tests live in Display/Speaker I/O cards below)
         var inputRows =
           _infoRow(
             t('sys.keyboard'),
-            '<span class="sys-info-text sys-conn-' + _escHtml(kb.conn) + '">' + _escHtml(kb.text) + '</span>',
-            false,
+            kb.empty
+              ? _val('info', kb.text || t('sys.notDetected'), { pillLabel: statusLabel('info') })
+              : _val(kb.status || 'pass', kb.text, { pillLabel: statusLabel(kb.status || 'pass') }),
+            !!kb.multi,
             kb.title || kb.text
           ) +
           _infoRow(
             t('sys.mouse'),
-            '<span class="sys-info-text sys-conn-' + _escHtml(mouse.conn) + '">' + _escHtml(mouse.text) + '</span>',
-            false,
+            mouse.empty
+              ? _val('info', mouse.text || t('sys.notDetected'), { pillLabel: statusLabel('info') })
+              : _val(mouse.status || 'pass', mouse.text, { pillLabel: statusLabel(mouse.status || 'pass') }),
+            !!mouse.multi,
             mouse.title || mouse.text
           ) +
           _infoRow(
@@ -665,7 +1020,14 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
             !!spk.multi,
             spk.title || spk.text
           ) +
-          _infoRow(t('sys.monitor'), _escHtml(monText), monParts.length > 1, monTitle);
+          _infoRow(
+            t('sys.monitor'),
+            monSum.empty
+              ? _val('info', monText || t('sys.notDetected'))
+              : _val(monSum.status || 'pass', monText),
+            !!monSum.multi,
+            monTitle
+          );
 
         var psy = (facts && facts.psychopy) || {};
         var psyPath = (facts && facts.psychopy_python_path) || '';
@@ -721,6 +1083,12 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
           _panel(t('sys.panelHardware'), hwRows) +
           _panel(t('sys.panelInput'), inputRows) +
           _panel(t('sys.panelEngine'), engRows);
+
+        try {
+          if (typeof window.__psyclawApplyIoTests === 'function') {
+            window.__psyclawApplyIoTests();
+          }
+        } catch (eIo) { /* path-test labels must not block host table paint */ }
 
         // Host display card — keyboard / mic / speaker status + monitors
                 fillDisplayIoStatus(kb, audio, facts);
@@ -822,12 +1190,25 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                                                               return navigator.mediaDevices.enumerateDevices();
                                                             }).then(function (devs) {
                                                               var mics = devs.filter(function (d) { return d.kind === 'audioinput'; })
-                                                                .map(function (d) { return { deviceId: d.deviceId, label: d.label || (t('builder.ioMicUnnamed') || 'Microphone'), name: d.label || (t('builder.ioMicUnnamed') || 'Microphone') }; });
+                                                                .map(function (d) {
+                                                                  var lab = (d.label || '').trim();
+                                                                  var bare = !lab;
+                                                                  var name = lab || (t('builder.ioMicUnnamed') || 'Microphone');
+                                                                  var virt = /VIRTUAL|VB-?AUDIO|CABLE|STEREO\s*MIX|NVIDIA\s*BROADCAST|\bBROADCAST\b|DEFAULT\s*-|COMMUNICATIONS\s*-/i.test(name);
+                                                                  return {
+                                                                    deviceId: d.deviceId,
+                                                                    label: name,
+                                                                    name: name,
+                                                                    virtual: virt || bare,
+                                                                    source: bare ? 'browser-generic' : 'browser',
+                                                                  };
+                                                                });
                                                               var outs = devs.filter(function (d) { return d.kind === 'audiooutput'; })
                                                                 .map(function (d) { return { deviceId: d.deviceId, name: d.label || (t('builder.ioSpkUnnamed') || 'Speaker'), label: d.label || (t('builder.ioSpkUnnamed') || 'Speaker') }; });
 
                                                               if (window.PsyClawBuilder) {
                                                                 if (typeof window.PsyClawBuilder.setHostMics === 'function') {
+                                                                  // Device picker may list browser endpoints; I/O status uses host authority
                                                                   window.PsyClawBuilder.setHostMics(mics);
                                                                 }
                                                                 // Prefer host Win32 speakers when present; else browser outputs
@@ -840,17 +1221,24 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                                                                 }
                                                               }
 
+                                                              var hostMicKnown = Array.isArray(hw.microphones);
+                                                              var hostMicSum = hostMicKnown
+                                                                ? _summarizeNameDevices(hw.microphones, 'builder.ioMicNone')
+                                                                : null;
+                                                              var browserMicSum = _summarizeNameDevices(mics, 'builder.ioMicNone');
+                                                              // Host probe is authority for I/O Mic status. Browser only fills gap when host omitted field.
+                                                              var micSumForUi = hostMicKnown ? hostMicSum : browserMicSum;
+                                                              if (!hostMicKnown) {
+                                                                lastHostMics = mics || [];
+                                                              }
+
                                                               if (micEl) {
-                                                                if (mics.length) {
-                                                                  var names = mics.map(function (d) { return d.label || d.name; })
-                                                                    .filter(function (n, i, a) { return n && a.indexOf(n) === i; })
-                                                                    .slice(0, 2);
-                                                                  var line = names.join(' · ');
-                                                                  if (mics.length > 2) line += ' (+' + (mics.length - 2) + ')';
-                                                                  setIoStatus(micEl, line, false);
+                                                                if (micSumForUi && !micSumForUi.empty) {
+                                                                  setIoStatus(micEl, micSumForUi.text, false);
+                                                                  try { micEl.classList.toggle('is-pending', micSumForUi.status === 'info'); } catch (eP) {}
                                                                 } else {
                                                                   var audioDetail = audioCheck && (audioCheck.detail || audioCheck.status);
-                                                                  if (audioDetail) {
+                                                                  if (audioDetail && !hostMicKnown) {
                                                                     setIoStatus(micEl, String(audioDetail), audioCheck && audioCheck.status === 'fail');
                                                                   } else {
                                                                     setIoStatus(micEl, t('builder.ioMicNone') || 'No microphone listed', true);
@@ -859,15 +1247,13 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                                                               }
 
                                                               // Host Input panel Mic/Speaker rows — same pill+text as Engine checks
-                                                              lastHostMics = mics || [];
                                                               var inputMic = document.getElementById('sys-input-mic');
-                                                              if (inputMic) {
-                                                                var micSum = _summarizeNameDevices(lastHostMics, 'builder.ioMicNone');
-                                                                inputMic.innerHTML = micSum.empty
-                                                                  ? _val('info', micSum.text || t('sys.notDetected'))
-                                                                  : _val('pass', micSum.text);
+                                                              if (inputMic && micSumForUi) {
+                                                                inputMic.innerHTML = micSumForUi.empty
+                                                                  ? _val('info', micSumForUi.text || t('sys.notDetected'), { pillLabel: statusLabel('info') })
+                                                                  : _val(micSumForUi.status || 'warn', micSumForUi.text, { pillLabel: statusLabel(micSumForUi.status || 'warn') });
                                                                 var micV = inputMic.parentElement;
-                                                                if (micV) micV.title = micSum.title || micSum.text || '';
+                                                                if (micV) micV.title = micSumForUi.title || micSumForUi.text || '';
                                                               }
                                                               var inputSpk = document.getElementById('sys-input-spk');
                                                               if (inputSpk) {
@@ -934,7 +1320,9 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                                     pushBrowserAudioLists();
                                             }
 
-                  async function runSystemChecks() {
+                  async function runSystemChecks(opts) {
+    opts = opts || {};
+    var forceFresh = !!opts.fresh;
     var allEl = document.getElementById('sys-checks-all')
       || document.getElementById('sys-checks-host');
     var overallEl = document.getElementById('sys-overall');
@@ -944,15 +1332,24 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
     var reportEl = document.getElementById('sys-report');
 
     var myGen = ++systemCheckGen;
+    systemCheckInFlight = true;
     paintGate({ checking: true }, '…');
-        if (allEl) allEl.innerHTML = '<li class="sys-check sys-check-info"><span class="sys-badge">…</span><div>' + t('sys.probing') + '</div></li>';
-        // Keep host card visible; always skeleton while probing (no leftover pass pills)
+        if (allEl && !lastSystemSnapshot) {
+          allEl.innerHTML = '<li class="sys-check sys-check-info"><span class="sys-badge">…</span><div>' + t('sys.probing') + '</div></li>';
+        }
+        // Soft recheck: keep previous host table visible (no skeleton wipe).
+        // Hard empty first paint only → skeleton.
         var devCard = document.getElementById('sys-device-card');
         if (devCard) {
           devCard.hidden = false;
           var lab = document.getElementById('sys-device-label');
-          if (lab) lab.textContent = t('sys.checking');
-          renderHostSkeleton();
+          if (lab && !lastSystemSnapshot) lab.textContent = t('sys.checking');
+          if (!lastSystemSnapshot) {
+            renderHostSkeleton();
+          } else {
+            var hpSoft = document.getElementById('sys-host-panels');
+            if (hpSoft) hpSoft.classList.add('is-checking');
+          }
         }
 
         try {
@@ -965,7 +1362,10 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
           if (Bpath && Bpath.getProjectPath) expPath = Bpath.getProjectPath() || '';
         } catch (e0) { expPath = ''; }
         try {
-          var sysUrl = '/api/system' + (expPath ? ('?path=' + encodeURIComponent(expPath)) : '');
+          var qs = [];
+          if (expPath) qs.push('path=' + encodeURIComponent(expPath));
+          if (forceFresh) qs.push('fresh=1');
+          var sysUrl = '/api/system' + (qs.length ? ('?' + qs.join('&')) : '');
           var r = await fetch(sysUrl);
           if (!r.ok) throw new Error('HTTP ' + r.status);
           hostReport = await r.json();
@@ -1128,7 +1528,7 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                         var metaLine =
                           (hostReport.elapsed_ms != null ? hostReport.elapsed_ms + ' ms' : '—') +
                           ' · ' + ts.toLocaleTimeString();
-                        paintGate(gate, metaLine);
+                        paintGate(gate, metaLine, counts);
 
                         if (overallEl) overallEl.textContent = (gate.level || overall) + (hostErr ? t('sys.apiError') : '');
                         if (elapsedEl) elapsedEl.textContent = (hostReport.elapsed_ms != null ? hostReport.elapsed_ms + ' ms host' : '—');
@@ -1158,8 +1558,38 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
         } finally {
           // only the latest probe owns the busy chrome
           if (myGen === systemCheckGen) {
+            systemCheckInFlight = false;
             var hp = document.getElementById('sys-host-panels');
             if (hp) hp.classList.remove('is-checking');
+            // Always drop busy when the latest probe ends (success, fail, or early return).
+            // Stale superseded probes leave busy to the newer gen.
+            try {
+              var nBusy = summaryNodes();
+              if (nBusy.btn && nBusy.btn.classList.contains('is-busy')) {
+                // If we never painted a final gate (exception path already does), clear busy
+                // only when button still says checking / still busy after success paint.
+                // paintGate(final) already clears busy; this is the safety net for stale/early exit.
+                if (!lastSystemSnapshot) {
+                  setSummaryBusy(false);
+                } else {
+                  // snapshot exists but UI may still be "checking" if paintGate was skipped (stale race)
+                  var lab = nBusy.label ? (nBusy.label.textContent || '') : '';
+                  if (/检测|checking|…|\.\.\./i.test(lab) || (nBusy.btn.getAttribute('data-gate') || '') === 'checking') {
+                    try {
+                      var gDone = lastSystemSnapshot.gate || computeRunGate(
+                        lastSystemSnapshot.checks || [],
+                        false,
+                        lastSystemSnapshot.facts || {}
+                      );
+                      var metaEl = document.getElementById('sys-meta-inline');
+                      paintGate(gDone, metaEl ? metaEl.textContent : null, lastSystemSnapshot && lastSystemSnapshot.counts);
+                    } catch (ePaint) {
+                      setSummaryBusy(false);
+                    }
+                  }
+                }
+              }
+            } catch (eF) { /* ignore */ }
           }
         }
                       }
@@ -1190,160 +1620,168 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
       }, { passive: false });
     }
 
-    // Keyboard arm — reaction time from Arm → keydown
-    var keyArm = document.getElementById('sys-key-arm');
-    var keyResult = document.getElementById('sys-key-result');
-    var keyCard = document.getElementById('probe-keyboard');
-    var armed = false;
-    var armHandler = null;
+    // I/O inline path tests (KB / Mouse / Speaker) — live in host I/O panel.
+    // Buttons are re-created on each system paint → event delegation + restore labels.
+    var ioKeyResult = '';
+    var ioMouseResult = '';
+    var ioAudioResult = '';
+    var keyArmed = false;
+    var keyArmHandler = null;
+    var mouseArmed = false;
+    var mouseArmHandler = null;
+
+    function ioEls() {
+      return {
+        keyArm: document.getElementById('sys-key-arm'),
+        keyResult: document.getElementById('sys-key-result'),
+        mouseArm: document.getElementById('sys-mouse-arm'),
+        mouseResult: document.getElementById('sys-mouse-result'),
+        audioBtn: document.getElementById('sys-audio-beep'),
+        audioResult: document.getElementById('sys-audio-result'),
+      };
+    }
+
+    function applyIoTests() {
+      var el = ioEls();
+      if (el.keyArm) {
+        el.keyArm.textContent = keyArmed ? t('sys.waitingCancel') : t('sys.kbArm');
+        el.keyArm.classList.toggle('is-armed', !!keyArmed);
+      }
+      if (el.keyResult) {
+        el.keyResult.textContent = ioKeyResult || t('sys.kbIdleShort');
+        el.keyResult.title = el.keyResult.textContent;
+      }
+      if (el.mouseArm) {
+        el.mouseArm.textContent = mouseArmed ? t('sys.waitingCancel') : t('sys.mouseArm');
+        el.mouseArm.classList.toggle('is-armed', !!mouseArmed);
+      }
+      if (el.mouseResult) {
+        el.mouseResult.textContent = ioMouseResult || t('sys.mouseIdleShort');
+        el.mouseResult.title = el.mouseResult.textContent;
+      }
+      if (el.audioBtn) el.audioBtn.textContent = t('sys.audioBeep');
+      if (el.audioResult) {
+        el.audioResult.textContent = ioAudioResult || t('sys.audioIdleShort');
+        el.audioResult.title = el.audioResult.textContent;
+      }
+    }
+    window.__psyclawApplyIoTests = applyIoTests;
+    applyIoTests();
 
     function disarmKey() {
-      armed = false;
-      if (armHandler) {
-        window.removeEventListener('keydown', armHandler, true);
-        armHandler = null;
+      keyArmed = false;
+      if (keyArmHandler) {
+        window.removeEventListener('keydown', keyArmHandler, true);
+        keyArmHandler = null;
       }
-      if (keyCard) keyCard.classList.remove('is-armed');
-      if (keyArm) keyArm.textContent = t('sys.kbArm');
+      applyIoTests();
     }
-
-    if (keyArm) {
-      keyArm.addEventListener('click', function () {
-        if (armed) {
-          disarmKey();
-          if (keyResult) keyResult.textContent = t('sys.disarmed');
-          return;
-        }
-        armed = true;
-        if (keyCard) keyCard.classList.add('is-armed');
-        if (keyArm) keyArm.textContent = t('sys.waitingCancel');
-        if (keyResult) keyResult.textContent = t('sys.armedKey');
-        var t0 = performance.now();
-        armHandler = function (ev) {
-          var dt = Math.round((performance.now() - t0) * 10) / 10;
-          if (keyResult) {
-            keyResult.textContent =
-              'key=' + (ev.key || '?') +
-              ' code=' + (ev.code || '?') +
-              ' · RT ' + dt + ' ms';
-          }
-          disarmKey();
-        };
-        window.addEventListener('keydown', armHandler, true);
-      });
-    }
-
-    // Mouse arm — reaction time from Arm → next click (button + coords)
-    var mouseArm = document.getElementById('sys-mouse-arm');
-    var mouseResult = document.getElementById('sys-mouse-result');
-    var mouseCard = document.getElementById('probe-mouse');
-    var mouseArmed = false;
-    var mouseHandler = null;
 
     function disarmMouse() {
       mouseArmed = false;
-      if (mouseHandler) {
-        window.removeEventListener('pointerdown', mouseHandler, true);
-        mouseHandler = null;
+      if (mouseArmHandler) {
+        window.removeEventListener('pointerdown', mouseArmHandler, true);
+        mouseArmHandler = null;
       }
-      if (mouseCard) mouseCard.classList.remove('is-armed');
-      if (mouseArm) mouseArm.textContent = t('sys.mouseArm');
+      applyIoTests();
     }
 
-    if (mouseArm) {
-      mouseArm.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (mouseArmed) {
-          disarmMouse();
-          if (mouseResult) mouseResult.textContent = t('sys.disarmed');
+    function armKey() {
+      if (keyArmed) {
+        disarmKey();
+        ioKeyResult = t('sys.disarmed');
+        applyIoTests();
+        return;
+      }
+      keyArmed = true;
+      ioKeyResult = t('sys.armedKey');
+      applyIoTests();
+      var t0 = performance.now();
+      keyArmHandler = function (ev) {
+        var dt = Math.round((performance.now() - t0) * 10) / 10;
+        ioKeyResult =
+          'key=' + (ev.key || '?') +
+          ' code=' + (ev.code || '?') +
+          ' · RT ' + dt + ' ms';
+        disarmKey();
+      };
+      window.addEventListener('keydown', keyArmHandler, true);
+    }
+
+    function armMouse(ev) {
+      if (ev) ev.stopPropagation();
+      if (mouseArmed) {
+        disarmMouse();
+        ioMouseResult = t('sys.disarmed');
+        applyIoTests();
+        return;
+      }
+      mouseArmed = true;
+      ioMouseResult = t('sys.armedMouse');
+      applyIoTests();
+      var t0 = performance.now();
+      var skip = true;
+      mouseArmHandler = function (e2) {
+        if (skip) {
+          skip = false;
           return;
         }
-        mouseArmed = true;
-        if (mouseCard) mouseCard.classList.add('is-armed');
-        if (mouseArm) mouseArm.textContent = t('sys.waitingCancel');
-        if (mouseResult) mouseResult.textContent = t('sys.armedMouse');
-        var t0 = performance.now();
-        // ignore the arming click itself (next event)
-        var skip = true;
-        mouseHandler = function (ev) {
-          if (skip) {
-            skip = false;
-            return;
-          }
-          var dt = Math.round((performance.now() - t0) * 10) / 10;
-          var btn = ev.button === 0 ? 'L' : (ev.button === 2 ? 'R' : String(ev.button));
-          var x = Math.round(ev.clientX);
-          var y = Math.round(ev.clientY);
-          if (mouseResult) {
-            mouseResult.textContent =
-              'btn=' + btn + ' @ ' + x + ',' + y +
-              ' · RT ' + dt + ' ms' +
-              (ev.pointerType ? ' · ' + ev.pointerType : '');
-          }
-          disarmMouse();
-        };
-        window.addEventListener('pointerdown', mouseHandler, true);
-      });
+        var dt = Math.round((performance.now() - t0) * 10) / 10;
+        var btn = e2.button === 0 ? 'L' : (e2.button === 2 ? 'R' : String(e2.button));
+        var x = Math.round(e2.clientX);
+        var y = Math.round(e2.clientY);
+        ioMouseResult =
+          'btn=' + btn + ' @ ' + x + ',' + y +
+          ' · RT ' + dt + ' ms' +
+          (e2.pointerType ? ' · ' + e2.pointerType : '');
+        disarmMouse();
+      };
+      window.addEventListener('pointerdown', mouseArmHandler, true);
     }
 
-    // Audio beep
-    var audioBtn = document.getElementById('sys-audio-beep');
-    var audioResult = document.getElementById('sys-audio-result');
-    if (audioBtn) {
-      audioBtn.addEventListener('click', function () {
-        try {
-          var AC = window.AudioContext || window.webkitAudioContext;
-          if (!AC) throw new Error('no AudioContext');
-          var ctx = new AC();
-          var osc = ctx.createOscillator();
-          var gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = 440;
-          gain.gain.value = 0.08;
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start();
-          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
-          osc.stop(ctx.currentTime + 0.26);
-          setTimeout(function () { try { ctx.close(); } catch (e) {} }, 400);
-          if (audioResult) audioResult.textContent = t('sys.playedTone');
-        } catch (e) {
-          if (audioResult) audioResult.textContent = t('sys.fail', { msg: (e.message || e) });
-        }
-      });
+    function playBeep() {
+      try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) throw new Error('no AudioContext');
+        var ctx = new AC();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 440;
+        gain.gain.value = 0.08;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+        osc.stop(ctx.currentTime + 0.26);
+        setTimeout(function () { try { ctx.close(); } catch (e) {} }, 400);
+        ioAudioResult = t('sys.playedTone');
+      } catch (e) {
+        ioAudioResult = t('sys.fail', { msg: (e.message || e) });
+      }
+      applyIoTests();
     }
 
-    // Fullscreen
-    var fsBtn = document.getElementById('sys-fs-btn');
-    var fsResult = document.getElementById('sys-fs-result');
-    if (fsBtn) {
-      fsBtn.addEventListener('click', function () {
-        try {
-          if (!document.fullscreenElement) {
-            var req = document.documentElement.requestFullscreen ||
-              document.documentElement.webkitRequestFullscreen;
-            if (!req) throw new Error('API missing');
-            req.call(document.documentElement).then(function () {
-              if (fsResult) fsResult.textContent = t('sys.fsOn');
-            }).catch(function (e) {
-              if (fsResult) fsResult.textContent = t('sys.denied', { msg: (e.message || e) });
-            });
-          } else {
-            var exit = document.exitFullscreen || document.webkitExitFullscreen;
-            exit.call(document).then(function () {
-              if (fsResult) fsResult.textContent = t('sys.fsOff');
-            });
-          }
-        } catch (e) {
-          if (fsResult) fsResult.textContent = t('sys.fail', { msg: (e.message || e) });
-        }
-      });
-      document.addEventListener('fullscreenchange', function () {
-        if (fsResult) {
-          fsResult.textContent = document.fullscreenElement ? t('sys.fsOn') : t('sys.fsOff');
-        }
-      });
-    }
+    var sysTab = document.getElementById('tab-system') || document;
+    sysTab.addEventListener('click', function (ev) {
+      var tEl = ev.target;
+      if (!tEl) return;
+      var id = tEl.id || (tEl.closest && tEl.closest('button') && tEl.closest('button').id) || '';
+      if (id === 'sys-key-arm') {
+        ev.preventDefault();
+        armKey();
+        return;
+      }
+      if (id === 'sys-mouse-arm') {
+        ev.preventDefault();
+        armMouse(ev);
+        return;
+      }
+      if (id === 'sys-audio-beep') {
+        ev.preventDefault();
+        playBeep();
+      }
+    });
 
     // System probe: first load + Re-run only (not every System tab click)
             // Data disk free is bound to Builder experiment folder path.
@@ -1392,27 +1830,24 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                 if (!found) checks.push(check);
                 lastSystemSnapshot.checks = checks;
               }
-              // only repaint host panels if they exist
+              // Repaint host table only when we already have a real host paint
+              // (or hardware facts). Never paint a disk-only shell — that
+              // races auto-open vs first /api/system and leaves empty rows
+              // after refresh until the user manually rechecks.
               var panels = document.getElementById('sys-host-panels');
-              if (panels && panels.dataset.hasData) {
-                renderDeviceFigure(
-                  lastSystemSnapshot.facts || {},
-                  lastSystemSnapshot.checks || [],
-                  lastSystemSnapshot.overall,
-                  lastSystemSnapshot.counts,
-                  lastSystemSnapshot.browserExtra
-                );
-              } else if (panels && lastSystemSnapshot.facts && lastSystemSnapshot.facts.disk) {
-                // host card may already be painted with pending — repaint if we have any data
+              var factsNow = lastSystemSnapshot.facts || {};
+              var hwNow = factsNow.hardware || null;
+              var hasHw = !!(hwNow && (hwNow.cpu || (hwNow.gpus && hwNow.gpus.length) || hwNow.ram_gb != null));
+              if (panels && (panels.dataset.hasData || hasHw)) {
                 try {
                   renderDeviceFigure(
-                    lastSystemSnapshot.facts || {},
+                    factsNow,
                     lastSystemSnapshot.checks || [],
                     lastSystemSnapshot.overall,
                     lastSystemSnapshot.counts,
                     lastSystemSnapshot.browserExtra
                   );
-                  panels.dataset.hasData = '1';
+                  if (hasHw) panels.dataset.hasData = '1';
                 } catch (eR) { /* ignore */ }
               }
               // disk pending/cleared can change Pilot vs participant gate
@@ -1426,7 +1861,7 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
                   lastSystemSnapshot.gate = g2;
                   lastSystemSnapshot.overall = g2.css === 'fail' ? 'fail' : (g2.css === 'warn' ? 'warn' : 'pass');
                   var metaEl = document.getElementById('sys-meta-inline');
-                  paintGate(g2, metaEl ? metaEl.textContent : null);
+                  paintGate(g2, metaEl ? metaEl.textContent : null, lastSystemSnapshot && lastSystemSnapshot.counts);
                 }
               } catch (eG) { /* ignore */ }
             }
@@ -1471,31 +1906,83 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
               }
             }
 
+            function hostTableNeedsPaint() {
+              var panels = document.getElementById('sys-host-panels');
+              if (!panels) return false;
+              // Mid-probe is NOT a reason to start another probe (that cancels the live one).
+              if (systemCheckInFlight || panels.classList.contains('is-checking')) return false;
+              if (!panels.dataset.hasData) return true;
+              if ((panels.innerHTML || '').indexOf('is-skel') >= 0 && !panels.dataset.hasData) return true;
+              if (!(panels.innerHTML || '').trim()) return true;
+              return false;
+            }
+
             function ensureSystemChecked(force) {
-              if (force || !systemCheckedOnce) {
+              // Coalesce: one in-flight probe. force only supersedes after stuck, or when idle.
+              if (systemCheckInFlight && !force) return;
+              if (force || !systemCheckedOnce || hostTableNeedsPaint()) {
                 systemCheckedOnce = true;
-                runSystemChecks();
+                // Button / stuck recheck → fresh=1; first paint / tab fill → cache OK
+                runSystemChecks({ fresh: !!force });
               }
             }
+
             var summaryBtn = document.getElementById('sys-summary');
+            var busySince = 0;
             if (summaryBtn) {
               summaryBtn.addEventListener('click', function () {
-                if (summaryBtn.disabled || summaryBtn.classList.contains('is-busy')) return;
+                var busy = summaryBtn.disabled || summaryBtn.classList.contains('is-busy');
+                if (busy || systemCheckInFlight) {
+                  // stuck busy >15s → allow force recheck (gen invalidates in-flight)
+                  if (!busySince) busySince = Date.now();
+                  if (Date.now() - busySince < 15000) return;
+                } else {
+                  busySince = 0;
+                }
                 ensureSystemChecked(true);
               });
             }
-            // first page load
+            // first page load — one probe
             setTimeout(function () { ensureSystemChecked(false); }, 0);
 
-            // when Builder Open/New/Save sets experiment folder → probe that volume only
+            // System tab shown: fill empty table once; never restart a live probe
+            document.querySelectorAll('.tab-btn').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                if (btn.dataset.tab !== 'system') return;
+                setTimeout(function () {
+                  if (systemCheckInFlight) return;
+                  if (hostTableNeedsPaint()) {
+                    ensureSystemChecked(false);
+                  } else if (lastSystemSnapshot && typeof renderDeviceFigure === 'function') {
+                    try {
+                      renderDeviceFigure(
+                        lastSystemSnapshot.facts,
+                        lastSystemSnapshot.checks,
+                        lastSystemSnapshot.overall,
+                        lastSystemSnapshot.counts,
+                        lastSystemSnapshot.browserExtra
+                      );
+                    } catch (eTab) { /* ignore */ }
+                  }
+                }, 0);
+              });
+            });
+
+            // project folder → disk row only; full probe only if table still empty AND idle
             function onExperimentPathChanged(ev) {
               var path =
                 (ev && ev.detail && (ev.detail.path || ev.detail.projectDir)) ||
                 getExperimentPath();
               refreshDiskForExperimentPath(path || '', true);
+              if (!systemCheckInFlight && hostTableNeedsPaint()) {
+                setTimeout(function () { ensureSystemChecked(false); }, 50);
+              }
             }
             document.addEventListener('psyclaw:file-state', onExperimentPathChanged);
             document.addEventListener('psyclaw:project-opened', onExperimentPathChanged);
+
+            // Light env drift: resolution / orientation / AV device plug — no full probe.
+            wireEnvDriftWatchers();
           }
 
   // ---------------------------------------------------------------
@@ -1506,17 +1993,29 @@ function renderDeviceFigure(facts, checks, overall, counts, browserExtra) {
   window.PsyClawSystem = {
     wire: wireSystemTab,
     getSnapshot: function () { return lastSystemSnapshot; },
+    getGate: function () { return lastRunGate || (lastSystemSnapshot && lastSystemSnapshot.gate) || null; },
+    getLastProven: function () { return lastProvenMode; },
+    setLastProven: setLastProvenMode,
+    isSystemStale: function () { return !!systemStale; },
+    paintRunGate: function () {
+      var g = lastRunGate || (lastSystemSnapshot && lastSystemSnapshot.gate);
+      if (g) paintRunStatusGate(g, lastSystemSnapshot && lastSystemSnapshot.counts);
+    },
     refreshHostUI: function () {
       if (lastSystemSnapshot && typeof renderDeviceFigure === 'function') {
-        renderDeviceFigure(
-          lastSystemSnapshot.facts,
-          lastSystemSnapshot.checks,
-          lastSystemSnapshot.overall,
-          lastSystemSnapshot.counts,
-          lastSystemSnapshot.browserExtra
-        );
+        try {
+          renderDeviceFigure(
+            lastSystemSnapshot.facts,
+            lastSystemSnapshot.checks,
+            lastSystemSnapshot.overall,
+            lastSystemSnapshot.counts,
+            lastSystemSnapshot.browserExtra
+          );
+        } catch (eRH) { /* ignore */ }
+      } else if (typeof runSystemChecks === 'function') {
+        runSystemChecks();
       }
     },
-    recheck: typeof runSystemChecks === 'function' ? runSystemChecks : null,
+    recheck: typeof runSystemChecks === 'function' ? function () { return runSystemChecks({ fresh: true }); } : null,
   };
 })();

@@ -122,10 +122,10 @@ def test_register_stores_experimenter(proj: str) -> None:
         participant_id="P01",
         session="1",
         run_id="r1",
-        experimenter="PsyClaw-AI",
+        experimenter="PsyClaw AI",
         participant_name="Ada",
     )
-    assert e and e["experimenter"] == "PsyClaw-AI"
+    assert e and e["experimenter"] == "PsyClaw AI"
     ents = preg.list_entries(proj)
-    assert ents[0]["experimenter"] == "PsyClaw-AI"
+    assert ents[0]["experimenter"] == "PsyClaw AI"
     assert ents[0]["participant_name"] == "Ada"

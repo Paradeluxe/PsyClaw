@@ -123,7 +123,7 @@ Prefer OA (author MS, OSF, PMC) before giving up. Host search before browser. No
 | 做一个…+文献/复现 | 1→**2**→3 paper-anchored→…→6 | lit on |
 | 可行性/概念聊聊 | answer; stay hear/clarify light | lit off until they say 按文献做 |
 | 改… | open marker → edit → 4→5→6 | gaps = touched only |
-| 要跑 / 多人 | handoff webui; experimenter=AI if agent-run | `ask_run=yes` |
+| 要跑 / 多人 | handoff webui; experimenter=PsyClaw AI if agent-run | `ask_run=yes` |
 | 不要跑 / 只要说明书 | stop at marker ready | `ask_run=no` · `done` |
 | 全装 / 首次 | `install-orchestrator.md` | outside design pipeline |
 | 更新 skill / psyclaw | skill + related + webui 整段 | same |

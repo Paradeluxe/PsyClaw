@@ -50,13 +50,14 @@ When talking to the user, say the stage in plain language (writing the marker / 
     "session": "1",
     "participant_name": "batch",
     "notes": "",
-    "experimenter": "PsyClaw-AI"
+    "experimenter": "PsyClaw AI"
   }
 }
 ```
 
 - Pilot: `participant_id: "P_pilot"` (no production ID burn)
 - Autopilot smoke: headless + auto-keys; agent default **3 sequential** Autopilot runs (each finished + full data pack)
+- **experimenter:** Autopilot / agent headless always stores `session.experimenter` = **`PsyClaw AI`** (webui forces this even if the form/API field is blank; CSV + roster + instrument)
 - Formal: sequential IDs from `participants.json`
 - Omit `project_path` → internal `runs/` only → **fails “data in project”**
 

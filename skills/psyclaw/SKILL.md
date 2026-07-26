@@ -2,7 +2,7 @@
 name: psyclaw
 description: >
   Use when psych exp from NL/Method/edit. Write <folder>.psyclaw;
-  ask-run→webui. Design-norms clarify; sequential CSV (AI experimenter
+  ask-run→webui. Design-norms clarify; sequential CSV (experimenter=PsyClaw AI
   if agent-run). Not lab GUI; not Builder XML.
 # Optional metadata (Agent Skills open standard: unknown keys are ignored)
 version: 0.3.12
@@ -82,7 +82,7 @@ Before the pipeline, a quick dep check (≤5s). Skip if already done this sessio
 ```text
 [pre-flight] → INPUT → [lit?] fetch paper first → Clarify (1 Q/turn) → Write+validate → ask run subjects? (session language)
          lit yes: search→browser tool if available→file on disk → paper-anchored clarify
-         run yes → webui sequential (experimenter=AI if agent-driven)
+         run yes → webui sequential (experimenter=PsyClaw AI if agent-driven)
 ```
 
 **State file:** read/write `.psyclaw-session.json` each step — `session-state.md`. No half-run mode. Multi-subject = sequential runs.

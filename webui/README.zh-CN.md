@@ -90,7 +90,7 @@ AI 技能写标记；本 UI 跑被试。技能安装 ≠ 本 GUI。
             否  → 停在标记文件
             是  → 打开本 webui / POST /api/runs
                   按顺序跑被试
-                  智能体驱动时：session.experimenter = AI 身份
+                  智能体驱动时：session.experimenter = PsyClaw AI
                   自动编号 / UID；P_pilot 不占号；结束后下一号
 ```
 

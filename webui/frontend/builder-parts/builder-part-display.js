@@ -633,12 +633,10 @@
     var slice = arr.slice(a, b + 1);
     var children = slice.map(cloneFlowNode).filter(Boolean);
     if (!children.length) return false;
-    var nameHint = opts.name || 'trials';
-    if (!opts.name) {
-      var firstR = firstRoutineName(children[0]);
-      if (children.length === 1 && firstR) nameHint = firstR + '_loop';
-      else if (firstR) nameHint = parentPath.length ? 'inner' : 'trials';
-    }
+    var nameHint = defaultLoopName(design && design.flow, children, {
+      name: opts.name,
+      nested: !!(parentPath && parentPath.length),
+    });
     arr.splice(a, b - a + 1, {
       kind: 'loop',
       name: nameHint,

@@ -130,9 +130,13 @@ def candidate_paths() -> List[str]:
     return out
 
 
+_IMPORT_OK_CACHE = {}
+
 def _can_import_psychopy(python_exe: str, timeout: float = 12.0) -> bool:
     if not python_exe or not os.path.isfile(python_exe):
         return False
+    if python_exe in _IMPORT_OK_CACHE:
+        return _IMPORT_OK_CACHE[python_exe]
     try:
         proc = subprocess.run(
             [
@@ -150,10 +154,15 @@ def _can_import_psychopy(python_exe: str, timeout: float = 12.0) -> bool:
                 "PSYCHOPY_DISABLE_VERSION_CHECK": "1",
             },
         )
-        return proc.returncode == 0 and bool((proc.stdout or "").strip())
+        ok = proc.returncode == 0 and bool((proc.stdout or "").strip())
+        _IMPORT_OK_CACHE[python_exe] = ok
+        return ok
     except (OSError, subprocess.TimeoutExpired):
+        _IMPORT_OK_CACHE[python_exe] = False
         return False
 
+
+_RESOLVE_CACHE = {"path": None, "source": None}
 
 def resolve_psychopy_python(
     *,
@@ -170,14 +179,23 @@ def resolve_psychopy_python(
     Standalone import-checks only when ``verify_import`` is True; otherwise the
     first existing standalone path is used.
     """
+    if (
+        not verify_import
+        and _RESOLVE_CACHE.get("path")
+        and os.path.isfile(_RESOLVE_CACHE["path"])
+    ):
+        return _RESOLVE_CACHE["path"], _RESOLVE_CACHE.get("source") or "cache"
+
     env = _env_override()
     if env and os.path.isfile(env):
         if not verify_import or _can_import_psychopy(env):
+            _RESOLVE_CACHE["path"], _RESOLVE_CACHE["source"] = env, "env"
             return env, "env"
 
     # 2) pip / venv / conda: must import psychopy
     for p in _path_library_candidates():
         if _can_import_psychopy(p):
+            _RESOLVE_CACHE["path"], _RESOLVE_CACHE["source"] = p, "library"
             return p, "library"
 
     # 3) Standalone / known bundles
@@ -186,9 +204,11 @@ def resolve_psychopy_python(
             continue
         if verify_import and not _can_import_psychopy(p):
             continue
+        _RESOLVE_CACHE["path"], _RESOLVE_CACHE["source"] = p, "standalone"
         return p, "standalone"
 
     if env:
+        _RESOLVE_CACHE["path"], _RESOLVE_CACHE["source"] = env, "fallback"
         return env, "fallback"
     if platform.system() == "Windows":
         return r"C:\Program Files\PsychoPy\python.exe", "fallback"

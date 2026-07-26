@@ -6,7 +6,7 @@
   <title>psyclaw-webui</title>
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=257">
+    <link rel="stylesheet" href="style.css?v=299">
     </head>
   <body class="no-project">
     <!-- Workspace gate: must open/create a folder before Builder/System/Run -->
@@ -59,7 +59,7 @@
                     <div>
                       <span class="eyebrow" data-i18n="sys.eyebrow">system</span>
                       <h2 data-i18n="sys.title">Host & engine</h2>
-                      <p class="muted sys-sub" data-i18n="sys.sub">Machine profile · PsychoPy readiness · live RT / path tests.</p>
+                      <p class="muted sys-sub" data-i18n="sys.sub">Machine profile · PsychoPy readiness · I/O path tests.</p>
                     </div>
                     <div class="sys-actions">
                                           <div class="sys-gate" id="sys-gate">
@@ -71,7 +71,7 @@
                                               title="Click to re-check host"
                                             >
                                               <span class="sys-summary-ico" aria-hidden="true">&#8634;</span>
-                                              <span class="sys-summary-label">—</span>
+                                              <span class="sys-summary-label" data-i18n="sys.recheck">Recheck</span>
                                             </button>
                                           </div>
                                           <span class="sys-meta-inline muted" id="sys-meta-inline">—</span>
@@ -163,6 +163,20 @@
                               <span class="bg-color-name" id="disp-bgcolor-label" aria-live="polite" hidden></span>
                             </div>
                           </div>
+                          <div class="sys-setting-row sys-io-field sys-io-field-test">
+                            <span class="sys-setting-lab" data-i18n="sys.keyboard">Keyboard</span>
+                            <div class="sys-setting-ctrl sys-io-test-inline">
+                              <button type="button" class="btn btn-secondary sys-io-test-btn" id="sys-key-arm" data-i18n="sys.kbArm">Arm key</button>
+                              <span class="sys-io-test-result" id="sys-key-result" data-i18n="sys.kbIdleShort">arm → key</span>
+                            </div>
+                          </div>
+                          <div class="sys-setting-row sys-io-field sys-io-field-test">
+                            <span class="sys-setting-lab" data-i18n="sys.mouse">Mouse</span>
+                            <div class="sys-setting-ctrl sys-io-test-inline">
+                              <button type="button" class="btn btn-secondary sys-io-test-btn" id="sys-mouse-arm" data-i18n="sys.mouseArm">Arm click</button>
+                              <span class="sys-io-test-result" id="sys-mouse-result" data-i18n="sys.mouseIdleShort">arm → click</span>
+                            </div>
+                          </div>
                           <div class="builder-display-host muted" id="disp-host-hint">—</div>
                         </div>
                       </div>
@@ -220,45 +234,25 @@
                               </select>
                             </div>
                           </div>
+                          <div class="sys-setting-row sys-io-field sys-io-field-test">
+                            <span class="sys-setting-lab" data-i18n="sys.audioTitle">Audio path</span>
+                            <div class="sys-setting-ctrl sys-io-test-inline">
+                              <button type="button" class="btn btn-secondary sys-io-test-btn" id="sys-audio-beep" data-i18n="sys.audioBeep">Beep 440Hz</button>
+                              <span class="sys-io-test-result" id="sys-audio-result" data-i18n="sys.audioIdleShort">beep path</span>
+                            </div>
+                          </div>
                         </div>
                       </section>
                     </div>
                   </div>
 
-                  <div class="sys-stack">
-                    <div class="sys-group sys-interactive">
-                      <div class="panel-heading sys-group-head">
-                        <span class="eyebrow" data-i18n="sys.liveProbes">live probes</span>
-                        <h3 data-i18n="sys.deviceTests">Device tests (RT / path)</h3>
-                      </div>
-                      <div class="sys-probe-row">
-                        <div class="sys-probe-card" id="probe-keyboard">
-                          <div class="sys-probe-title" data-i18n="sys.kbTitle">Keyboard RT</div>
-                          <button type="button" class="btn btn-secondary" id="sys-key-arm" data-i18n="sys.kbArm">Arm key</button>
-                          <div class="sys-probe-result" id="sys-key-result" data-i18n="sys.kbIdle">idle — Arm then press a key</div>
-                        </div>
-                        <div class="sys-probe-card" id="probe-mouse">
-                          <div class="sys-probe-title" data-i18n="sys.mouseTitle">Mouse RT</div>
-                          <button type="button" class="btn btn-secondary" id="sys-mouse-arm" data-i18n="sys.mouseArm">Arm click</button>
-                          <div class="sys-probe-result" id="sys-mouse-result" data-i18n="sys.mouseIdle">idle — Arm then click anywhere</div>
-                        </div>
-                        <div class="sys-probe-card" id="probe-audio">
-                          <div class="sys-probe-title" data-i18n="sys.audioTitle">Audio path</div>
-                          <button type="button" class="btn btn-secondary" id="sys-audio-beep" data-i18n="sys.audioBeep">Beep 440Hz</button>
-                          <div class="sys-probe-result" id="sys-audio-result" data-i18n="sys.audioIdle">idle — hear a short tone?</div>
-                        </div>
-                        <div class="sys-probe-card" id="probe-fullscreen">
-                          <div class="sys-probe-title" data-i18n="sys.fsTitle">Fullscreen</div>
-                          <button type="button" class="btn btn-secondary" id="sys-fs-btn" data-i18n="sys.fsToggle">Toggle FS</button>
-                          <div class="sys-probe-result" id="sys-fs-result" data-i18n="sys.fsIdle">idle — participant window path</div>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- checklist removed (info lives in host panels); keep hidden sinks for any leftover ids -->
-                                        <ul id="sys-checks-all" hidden></ul>
-                                        <ul id="sys-checks-host" hidden></ul>
-                                        <ul id="sys-checks-browser" hidden></ul>
-                                      </div>
+                  <!-- live probes merged into Display / Speaker I/O cards -->
+                  <div class="sys-stack" hidden aria-hidden="true">
+                    <!-- checklist sinks kept for any leftover ids -->
+                    <ul id="sys-checks-all" hidden></ul>
+                    <ul id="sys-checks-host" hidden></ul>
+                    <ul id="sys-checks-browser" hidden></ul>
+                  </div>
                               </section>
 
     <!-- ============================================================ -->
@@ -349,11 +343,11 @@
               <div>
                 <span class="eyebrow" data-i18n="run.eyebrow">flight</span>
                 <h2 data-i18n="run.title">Run</h2>
-                <p class="muted" data-i18n="run.lead">Start = live · Pilot = manual live · Autopilot = auto keys. Telemetry below.</p>
+                <p class="muted" data-i18n="run.lead">Start = live participant · Pilot = live manual test · Autopilot = headless auto test.</p>
               </div>
               <div class="run-status-line">
                 <span class="muted" data-i18n="run.status">Status:</span>
-                <span id="run-status-badge" class="status-badge status-idle" data-i18n="run.ready">ready to compile</span>
+                <span id="run-status-badge" class="status-badge status-idle" data-gate="" title="">—</span>
               </div>
             </div>
 
@@ -361,14 +355,14 @@
                     <button id="start-run-btn" class="btn btn-primary" type="button">
                       <span aria-hidden="true">&#9654;</span> <span data-i18n="run.start">Start</span>
                     </button>
-                    <button id="pilot-run-btn" class="btn btn-pilot" type="button" data-i18n-title="run.pilotTitle" title="Pilot — live window, manual keys (does not consume IDs)">
+                    <button id="pilot-run-btn" class="btn btn-pilot" type="button" data-i18n-title="run.pilotTitle" title="Pilot — live window, manual responses, does not consume participant IDs">
                       <svg class="btn-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
                         <path d="M22 2 11 13" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
                         <path d="M22 2 15 22 11 13 2 9 22 2z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
                       </svg>
                       <span data-i18n="run.pilot">Pilot</span>
                     </button>
-                    <button id="autopilot-run-btn" class="btn btn-autopilot" type="button" data-i18n-title="run.autopilotTitle" title="Autopilot — auto-simulate keys, capped loops">
+                    <button id="autopilot-run-btn" class="btn btn-autopilot" type="button" data-i18n-title="run.autopilotTitle" title="Autopilot — headless automatic responses for pipeline checks, does not consume participant IDs">
                       <svg class="btn-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false">
                         <circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="1.75"/>
                         <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
@@ -385,7 +379,7 @@
                                           <span data-i18n="run.openFolder">Open folder</span>
                                         </button>
                   </div>
-                  <p class="muted run-mode-hint" id="run-mode-hint" data-i18n="run.modeHint">Start = live participant · Pilot = live manual · Autopilot = auto key simulation. Session form replaces PsychoPy expInfo.</p>
+                  <p class="muted run-mode-hint" id="run-mode-hint" data-i18n="run.modeHint">Start uses a real participant ID · Pilot is manual and does not consume IDs · Autopilot simulates responses automatically. Session form replaces PsychoPy expInfo.</p>
 
                         <div class="run-telemetry" id="run-telemetry" aria-label="Run telemetry">
                           <div class="run-telemetry-item">
@@ -523,7 +517,7 @@
                               <span class="eyebrow" data-i18n="run.bench">bench</span>
                               <h3 data-i18n="run.instrument">Instrument</h3>
                             </div>
-                            <p class="run-instr-empty muted" id="instr-empty" data-i18n="run.instrEmpty">No run yet. After Pilot / Start, FPS and devices show here.</p>
+                            <p class="run-instr-empty muted" id="instr-empty" data-i18n="run.instrEmpty">No completed run yet. Start, Pilot, or Autopilot results appear here.</p>
                             <dl class="status-list" id="pilot-instrument-list" hidden>
                                                           <div><dt data-i18n="run.instrStatus">Status</dt><dd id="instr-status">—</dd></div>
                                                           <div><dt data-i18n="run.instrMode">Mode</dt><dd id="instr-mode">—</dd></div>
@@ -798,10 +792,10 @@
     </footer>
 
     <!-- i18n → builder (parts assembled into builder.js) → app system/run → shell -->
-    <script src="i18n.js?v=263"></script>
-            <script src="builder.js?v=261"></script>
-            <script src="app-system.js?v=263"></script>
-        <script src="app-run.js?v=261"></script>
-        <script src="app.js?v=260"></script>
+    <script src="i18n.js?v=276"></script>
+            <script src="builder.js?v=263"></script>
+            <script src="app-system.js?v=281"></script>
+        <script src="app-run.js?v=267"></script>
+        <script src="app.js?v=262"></script>
   </body>
 </html>

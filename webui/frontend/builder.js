@@ -5,20 +5,11 @@
  *   render(), selectComponent(id), selectRoutine(name)
  * }
  *
- * Design schema:
- * {
- *   name: string,
- *   display: { size: [w,h], fullscreen: bool, bgcolor: string },
- *   routines: [{ name, components: [{ id, type, name, start, duration, params }] }],
- *   flow: [{ kind: 'routine'|'loop', routine?, name?, nReps?, children? }]
- * }
+ * Modular source: frontend/builder-parts/*.js
+ * Assemble: python webui/scripts/_split_builder.py --assemble
  */
 (function () {
   'use strict';
-
-  /* modular parts live in builder-parts/ for editing; this file is the runtime bundle.
-   * Maintainers: edit builder-parts/*.js then run: python webui/scripts/_split_builder.py --assemble
-   */
 
   // ---- builder-part-model.js ----
 function t(key, vars) {
@@ -31,6 +22,181 @@ function t(key, vars) {
     if (!ct) return '';
     if (ct.labelKey) return t(ct.labelKey);
     return ct.label || ct.type || '';
+  }
+
+
+
+  /** Sanitize one path segment for loop names (readable, no codes). */
+  function slugLoopStem(s) {
+    var t = String(s || '')
+      .trim()
+      .replace(/([a-z])([A-Z])/g, '$1_$2')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .replace(/_+/g, '_');
+    // drop empty / pure numeric stems (not meaningful)
+    if (!t || /^[0-9]+$/.test(t)) return '';
+    // strip leading loop_ if user pasted full name
+    if (t.indexOf('loop_') === 0) t = t.slice(5).replace(/^_+/, '');
+    // refuse opaque code-like tails: single letter + digits (b1, a2)
+    if (/^[a-z][0-9]+$/.test(t)) return '';
+    return t.slice(0, 48);
+  }
+
+  function collectLoopNames(nodes, out) {
+    out = out || [];
+    (nodes || []).forEach(function (n) {
+      if (!n) return;
+      if (n.kind === 'loop') {
+        out.push(String(n.name || ''));
+        collectLoopNames(n.children, out);
+      } else if (n.children) {
+        collectLoopNames(n.children, out);
+      }
+    });
+    return out;
+  }
+
+  /**
+   * Default loop.name: always loop_<readable>.
+   * stem from child routine(s); nested → loop_nested_*;
+   * clash → _copy / _followup / _extra (no b1 / x2 codes).
+   */
+  function defaultLoopName(flowRoot, children, opts) {
+    opts = opts || {};
+    var nested = !!opts.nested;
+    var forced = opts.name != null && String(opts.name).trim() !== '' ? String(opts.name).trim() : '';
+    var stem = '';
+    if (forced) {
+      stem = slugLoopStem(forced);
+    } else {
+      var names = [];
+      function firstRoutine(node, depth) {
+        if (!node || depth > 8) return;
+        if (node.routine) {
+          names.push(String(node.routine));
+          return;
+        }
+        if (node.kind === 'loop' && node.children) {
+          for (var i = 0; i < node.children.length && names.length < 2; i++) {
+            firstRoutine(node.children[i], depth + 1);
+          }
+        }
+      }
+      (children || []).forEach(function (ch) { firstRoutine(ch, 0); });
+      if (names.length === 1) {
+        stem = slugLoopStem(names[0]);
+      } else if (names.length >= 2) {
+        var a = slugLoopStem(names[0]);
+        var b = slugLoopStem(names[1]);
+        stem = [a, b].filter(Boolean).join('_');
+      }
+      if (!stem) stem = nested ? 'nested' : 'main';
+      // practice keyword in routine → prefer practice
+      var blob = names.join(' ').toLowerCase();
+      if (!forced && /practice|prac|练习|練習/.test(blob)) stem = 'practice';
+    }
+    if (!stem) stem = nested ? 'nested' : 'main';
+    if (nested && stem !== 'nested' && stem.indexOf('nested_') !== 0 && stem !== 'practice') {
+      stem = 'nested_' + stem;
+    }
+    var base = 'loop_' + stem;
+    var used = {};
+    collectLoopNames(flowRoot || [], []).forEach(function (n) {
+      used[String(n).toLowerCase()] = true;
+    });
+    if (!used[base.toLowerCase()]) return base;
+    // readable clash suffixes — words, not b1/a2
+    var suffixes = ['copy', 'followup', 'extra', 'alt', 'more'];
+    var i, cand;
+    for (i = 0; i < suffixes.length; i++) {
+      cand = base + '_' + suffixes[i];
+      if (!used[cand.toLowerCase()]) return cand;
+    }
+    cand = base + '_copy_again';
+    if (!used[cand.toLowerCase()]) return cand;
+    var n = 2;
+    while (used[(base + '_copy_again_' + n).toLowerCase()]) n++;
+    return base + '_copy_again_' + n;
+  }
+
+
+  /** Stimlist row weight for loopType=weighted. Missing/invalid → 1; negative → 0. */
+  function rowWeight(row) {
+    if (!row || typeof row !== 'object') return 1;
+    if (row.weight === undefined || row.weight === null || row.weight === '') return 1;
+    var n = Number(row.weight);
+    if (!isFinite(n)) return 1;
+    n = Math.floor(n);
+    if (n < 0) return 0;
+    return n;
+  }
+
+  /** Total trials a loop expands to (matches design_compiler). */
+  function loopTrialCount(loop) {
+    if (!loop) return 1;
+    var nR = Number(loop.nReps);
+    if (!isFinite(nR) || nR < 1) nR = 1;
+    nR = Math.floor(nR);
+    var conds = loop.conditions;
+    if (!Array.isArray(conds) || !conds.length) return nR;
+    var lt = String(loop.loopType || 'sequential').toLowerCase().replace(/[_-]/g, '');
+    if (lt === 'weighted' || lt === 'weightedrandom' || lt === 'proportion' || lt === 'proportional') {
+      var sum = 0;
+      for (var i = 0; i < conds.length; i++) sum += rowWeight(conds[i]);
+      return nR * sum;
+    }
+    return nR * conds.length;
+  }
+
+  /** Ensure every conditions row has weight when loopType is weighted. */
+  function ensureWeightColumn(loop) {
+    if (!loop) return;
+    if (!Array.isArray(loop.conditions)) loop.conditions = [];
+    loop.conditions.forEach(function (row) {
+      if (!row || typeof row !== 'object') return;
+      if (row.weight === undefined || row.weight === null || row.weight === '') row.weight = 1;
+    });
+  }
+
+  /**
+   * Word-like preferred column width (ch): max of header + cell text lengths.
+   * Floor/ceiling keep weight compact and long text from blowing the panel.
+   */
+  function condColCharWidths(cols, conditions) {
+    var out = {};
+    (cols || []).forEach(function (c) {
+      var m = String(c || '').length;
+      (conditions || []).forEach(function (row) {
+        if (!row || typeof row !== 'object') return;
+        var s = row[c] == null ? '' : String(row[c]);
+        if (s.length > m) m = s.length;
+      });
+      var floor = c === 'weight' ? 3 : 4;
+      var pad = c === 'weight' ? 1 : 2;
+      out[c] = Math.min(56, Math.max(floor, m + pad));
+    });
+    return out;
+  }
+
+  function applyContentChWidth(el, ch) {
+    if (!el) return;
+    var n = Math.max(1, Math.min(56, Math.floor(Number(ch) || 4)));
+    // Under table-layout:fixed, only size/attr matter — never force minWidth
+    // that steals free space into one column.
+    el.style.width = '100%';
+    el.style.minWidth = '0';
+    el.setAttribute('size', String(n));
+    el.dataset.contentCh = String(n);
+  }
+
+  /** Keep size attr in sync while typing; width stays 100% of cell. */
+  function growInputToContent(inp, floorCh) {
+    if (!inp) return;
+    var floor = Math.max(1, Math.floor(Number(floorCh) || 4));
+    var need = Math.min(56, Math.max(floor, String(inp.value || '').length + 2));
+    applyContentChWidth(inp, need);
   }
 
   var COMPONENT_TYPES = [
@@ -815,12 +981,10 @@ function t(key, vars) {
     var slice = arr.slice(a, b + 1);
     var children = slice.map(cloneFlowNode).filter(Boolean);
     if (!children.length) return false;
-    var nameHint = opts.name || 'trials';
-    if (!opts.name) {
-      var firstR = firstRoutineName(children[0]);
-      if (children.length === 1 && firstR) nameHint = firstR + '_loop';
-      else if (firstR) nameHint = parentPath.length ? 'inner' : 'trials';
-    }
+    var nameHint = defaultLoopName(design && design.flow, children, {
+      name: opts.name,
+      nested: !!(parentPath && parentPath.length),
+    });
     arr.splice(a, b - a + 1, {
       kind: 'loop',
       name: nameHint,
@@ -2971,10 +3135,9 @@ function t(key, vars) {
                     if (lo === hi && arr[lo] && arr[lo].kind === 'loop' && !meta.bubbleOuter) return { ok: false, meta: meta };
                     var slice = arr.slice(lo, hi + 1);
           var kids = slice.map(function (n) { return JSON.parse(JSON.stringify(n)); });
-          var nameHint = 'trials';
-          var firstR = kids[0] && (kids[0].routine || (kids[0].children && kids[0].children[0] && kids[0].children[0].routine));
-          if (kids.length === 1 && firstR) nameHint = firstR + '_loop';
-          else if (parentPath.length) nameHint = 'inner';
+          var nameHint = defaultLoopName(flowCopy, kids, {
+            nested: !!(parentPath && parentPath.length),
+          });
           var newLoop = {
             kind: 'loop',
             name: nameHint,
@@ -3058,9 +3221,9 @@ function t(key, vars) {
                                             var lab = el('span', 'flow-bracket-label', escapeHtml(brInfo.name));
                                             var gR = (isFinite(brInfo.nReps) && brInfo.nReps >= 1) ? brInfo.nReps : 1;
                                             var gC = brInfo.nCond > 0 ? brInfo.nCond : 0;
-                                            var gTotal = gC > 0 ? (gR * gC) : gR;
+                                            var gTotal = brInfo.node ? loopTrialCount(brInfo.node) : (gC > 0 ? (gR * gC) : gR);
                                             var reps = el('span', 'flow-bracket-reps', '\u00d7' + gTotal);
-                                            reps.title = gC > 0 ? (gR + ' reps \u00d7 ' + gC + ' rows = ' + gTotal + ' trials') : (gR + ' reps');
+                                            reps.title = gC > 0 ? (gR + ' reps \u00d7 rows/weights = ' + gTotal + ' trials') : (gR + ' reps');
                                             g.appendChild(lab);
                                             g.appendChild(reps);
                                             if (brInfo.isNew) {
@@ -3360,7 +3523,7 @@ function t(key, vars) {
                         var lab = el('span', 'flow-bracket-label', escapeHtml(b.name));
                         var nR = (isFinite(b.nReps) && b.nReps >= 1) ? b.nReps : 1;
                         var nC = (b.nCond > 0) ? b.nCond : 0;
-                        var totalTrials = nC > 0 ? (nR * nC) : nR;
+                        var totalTrials = b.node ? loopTrialCount(b.node) : (nC > 0 ? (nR * nC) : nR);
                         lab.title = (nC > 0
                           ? t('flow.nRepsCond', { n: nR, c: nC, t: totalTrials })
                           : t('flow.nRepsEdit', { n: nR }));
@@ -3377,7 +3540,9 @@ function t(key, vars) {
                         var repsLabel = '\u00d7' + totalTrials;
                         var reps = el('span', 'flow-bracket-reps', repsLabel);
                         reps.title = nC > 0
-                          ? (nR + ' reps \u00d7 ' + nC + ' rows = ' + totalTrials + ' trials')
+                          ? ((b.node && String(b.node.loopType || '').toLowerCase() === 'weighted')
+                              ? (nR + ' reps \u00d7 sum(weight) = ' + totalTrials + ' trials')
+                              : (nR + ' reps \u00d7 ' + nC + ' rows = ' + totalTrials + ' trials'))
                           : (nR + ' repetitions');
                         var ux = el('button', 'flow-bracket-x');
                         ux.type = 'button';
@@ -4348,6 +4513,20 @@ function t(key, vars) {
       var conditions = ensureLoopConditions(loop);
       var nCond = conditions.length;
       var cols = conditionColumns(conditions);
+      if ((loop.loopType || '') === 'weighted') {
+        ensureWeightColumn(loop);
+        // weight first when active
+        if (cols.indexOf('weight') < 0) {
+          cols = ['weight'].concat(cols);
+        } else if (cols.indexOf('weight') > 0) {
+          cols = ['weight'].concat(cols.filter(function (c) { return c !== 'weight'; }));
+        }
+      } else {
+        // Hide weight UI outside weighted; keep row.weight in data if present
+        cols = cols.filter(function (c) { return c !== 'weight'; });
+      }
+      // size attr floors only; widths via <colgroup>
+      var colCh = condColCharWidths(cols, conditions);
 
       var bar = el('div', 'cond-toolbar');
       var meta = el('div', 'cond-meta');
@@ -4368,7 +4547,7 @@ function t(key, vars) {
                 ? t('flow.chipStats', {
                     rows: nCond,
                     cols: cols.length,
-                    trials: ((loop.nReps || 1) * nCond)
+                    trials: loopTrialCount(loop)
                   })
                 : (cols.length
                     ? t('flow.chipStatsEmptyRows', { cols: cols.length })
@@ -4394,6 +4573,10 @@ function t(key, vars) {
         if (!name) return;
         if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
           alert('Column name must be identifier-like: letters/digits/_ (for $colName params)');
+          return;
+        }
+        if (name === 'weight' && (loop.loopType || '') !== 'weighted') {
+          alert(t('flow.weightNameReserved') || 'Column name "weight" is reserved for loopType=weighted');
           return;
         }
         ensureLoopConditions(loop);
@@ -4491,6 +4674,21 @@ function t(key, vars) {
       var table = document.createElement('table');
       table.className = 'loop-cond-preview is-wide is-editable';
 
+      // Fixed layout colgroup: # + weight(optional) fixed; text cols share rest; act fixed
+      var colgroup = document.createElement('colgroup');
+      var colIdx = document.createElement('col');
+      colIdx.className = 'cond-col-idx';
+      colgroup.appendChild(colIdx);
+      cols.forEach(function (c) {
+        var col = document.createElement('col');
+        col.className = c === 'weight' ? 'cond-col-weight' : 'cond-col-data';
+        colgroup.appendChild(col);
+      });
+      var colAct = document.createElement('col');
+      colAct.className = 'cond-col-act';
+      colgroup.appendChild(colAct);
+      table.appendChild(colgroup);
+
       var thead = document.createElement('thead');
       var headRow = document.createElement('tr');
       var thIdx = document.createElement('th');
@@ -4498,55 +4696,79 @@ function t(key, vars) {
       headRow.appendChild(thIdx);
       cols.forEach(function (c) {
         var th = document.createElement('th');
-        th.className = 'cond-col-head';
+        th.className = 'cond-col-head' + (c === 'weight' ? ' is-locked-col' : '');
         var headInner = el('div', 'cond-col-head-inner');
         var nameIn = document.createElement('input');
         nameIn.type = 'text';
         nameIn.className = 'cond-col-name';
         nameIn.value = c;
-        nameIn.title = 'Column name — use as $' + c + ' in component params';
-        nameIn.addEventListener('change', function () {
-          var neu = String(nameIn.value || '').trim();
-          if (!neu || neu === c) {
-            nameIn.value = c;
-            return;
-          }
-          if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(neu)) {
-            alert('Column name must be identifier-like');
-            nameIn.value = c;
-            return;
-          }
-          if (cols.indexOf(neu) >= 0) {
-            alert('Column already exists: ' + neu);
-            nameIn.value = c;
-            return;
-          }
-          loop.conditions.forEach(function (row) {
-            if (!row) return;
-            row[neu] = row[c];
-            delete row[c];
+        var isWeightCol = (c === 'weight');
+        if (isWeightCol) {
+          nameIn.readOnly = true;
+          nameIn.classList.add('is-locked');
+          nameIn.title = t('flow.weightColLocked') || 'weight — required for loopType=weighted (cannot rename or delete)';
+        } else {
+          nameIn.title = 'Column name — use as $' + c + ' in component params';
+          nameIn.addEventListener('change', function () {
+            var neu = String(nameIn.value || '').trim();
+            if (!neu || neu === c) {
+              nameIn.value = c;
+              return;
+            }
+            if (neu === 'weight') {
+              alert(t('flow.weightNameReserved') || 'Column name "weight" is reserved');
+              nameIn.value = c;
+              return;
+            }
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(neu)) {
+              alert('Column name must be identifier-like');
+              nameIn.value = c;
+              return;
+            }
+            if (cols.indexOf(neu) >= 0) {
+              alert('Column already exists: ' + neu);
+              nameIn.value = c;
+              return;
+            }
+            loop.conditions.forEach(function (row) {
+              if (!row) return;
+              row[neu] = row[c];
+              delete row[c];
+            });
+            emitChange();
+            render();
           });
-          emitChange();
-          render();
-        });
+          nameIn.addEventListener('input', function () {
+            growInputToContent(nameIn, colCh[c] || 4);
+          });
+        }
+        applyContentChWidth(nameIn, colCh[c] || 4);
         headInner.appendChild(nameIn);
-        var delC = document.createElement('button');
-        delC.type = 'button';
-        delC.className = 'cond-col-del';
-        delC.setAttribute('aria-label', 'Delete column ' + c);
-        delC.textContent = '\u00d7';
-        delC.title = 'Delete column ' + c;
-        delC.addEventListener('click', function (e) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!window.confirm('Delete column "' + c + '"?')) return;
-          loop.conditions.forEach(function (row) {
-            if (row) delete row[c];
+        if (!isWeightCol) {
+          var delC = document.createElement('button');
+          delC.type = 'button';
+          delC.className = 'cond-col-del';
+          delC.setAttribute('aria-label', 'Delete column ' + c);
+          delC.textContent = '\u00d7';
+          delC.title = 'Delete column ' + c;
+          delC.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (c === 'weight') return;
+            if (!window.confirm('Delete column "' + c + '"?')) return;
+            loop.conditions.forEach(function (row) {
+              if (row) delete row[c];
+            });
+            emitChange();
+            render();
           });
-          emitChange();
-          render();
-        });
-        headInner.appendChild(delC);
+          headInner.appendChild(delC);
+        } else {
+          var lockMark = el('span', 'cond-col-lock', '\u00b7');
+          lockMark.title = t('flow.weightColLocked') || 'weight column locked';
+          lockMark.setAttribute('aria-hidden', 'true');
+          headInner.appendChild(lockMark);
+        }
         th.appendChild(headInner);
         headRow.appendChild(th);
       });
@@ -4576,21 +4798,45 @@ function t(key, vars) {
         tr.appendChild(tdI);
         cols.forEach(function (c) {
           var td = document.createElement('td');
-          td.className = 'cond-cell';
+          td.className = 'cond-cell' + (c === 'weight' ? ' cond-cell-weight' : '');
           var inp = document.createElement('input');
-          inp.type = 'text';
-          inp.className = 'cond-cell-input';
+          var isWeight = (c === 'weight');
+          inp.type = isWeight ? 'number' : 'text';
+          if (isWeight) {
+            inp.min = '0';
+            inp.step = '1';
+            inp.className = 'cond-cell-input cond-weight-input';
+          } else {
+            inp.className = 'cond-cell-input';
+          }
           inp.value = row[c] == null ? '' : String(row[c]);
           inp.setAttribute('aria-label', c + ' row ' + (i + 1));
+          applyContentChWidth(inp, colCh[c] || (isWeight ? 3 : 4));
+          if (isWeight) inp.title = t('flow.weightHint') || 'Copies of this row in the bag (loopType=weighted)';
           inp.addEventListener('input', function () {
-            row[c] = inp.value;
+            if (isWeight) {
+              var v = parseInt(inp.value, 10);
+              row[c] = isNaN(v) || v < 0 ? 0 : v;
+            } else {
+              row[c] = inp.value;
+            }
+            growInputToContent(inp, colCh[c] || (isWeight ? 3 : 4));
             markDirty();
             softRefreshPreview();
           });
           inp.addEventListener('change', function () {
-            row[c] = inp.value;
-            emitChange();
-            softRefreshPreview();
+            if (isWeight) {
+              var v = parseInt(inp.value, 10);
+              row[c] = isNaN(v) || v < 0 ? 0 : v;
+              inp.value = String(row[c]);
+              emitChange();
+              renderConditionsPanel();
+              renderFlowList();
+            } else {
+              row[c] = inp.value;
+              emitChange();
+              softRefreshPreview();
+            }
           });
           td.appendChild(inp);
           tr.appendChild(td);
@@ -4659,19 +4905,25 @@ function t(key, vars) {
                       });
                       lfield(t('insp.nReps'), repsIn);
                       var typeIn = document.createElement('select');
-                      ['sequential', 'random', 'fullRandom'].forEach(function (t) {
+                      ['sequential', 'random', 'fullRandom', 'weighted'].forEach(function (lt) {
                         var opt = document.createElement('option');
-                        opt.value = t;
-                        opt.textContent = t;
-                        if ((loop.loopType || 'sequential') === t) opt.selected = true;
+                        opt.value = lt;
+                        opt.textContent = lt === 'weighted' ? (t('insp.loopTypeWeighted') || 'weighted') : lt;
+                        if ((loop.loopType || 'sequential') === lt) opt.selected = true;
                         typeIn.appendChild(opt);
                       });
                       typeIn.addEventListener('change', function () {
                         loop.loopType = typeIn.value || 'sequential';
+                        if (loop.loopType === 'weighted') ensureWeightColumn(loop);
                         emitChange();
+                        renderConditionsPanel();
+                        renderFlowList();
                         renderJsonPreview();
                       });
                       lfield(t('insp.loopType'), typeIn);
+                      if ((loop.loopType || '') === 'weighted') {
+                        box.appendChild(el('p', 'muted builder-ms-hint', t('insp.weightedHint')));
+                      }
 
                       var actions = el('div', 'builder-insp-actions');
                       var unwrapBtn = el('button', 'btn btn-secondary');

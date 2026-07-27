@@ -5527,7 +5527,7 @@ flex: 1 1 auto;
   font-size: var(--fs-sm);
   font-family: var(--font);
 }
-
+.loop-cond-preview.is-wide {
   font-size: var(--fs-14);
 }
 .loop-cond-preview col.cond-col-idx {

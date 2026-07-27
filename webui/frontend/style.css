@@ -2944,7 +2944,7 @@ font-size: var(--fs-sm);
 
 /* Edge: pure hairline only (Linear/Stripe — no chevron, no triangle, no double-draw). */
 .flow-connector {
-  flex: 0 0 40px;
+  flex: 0 0 64px;
   height: 1px;
   align-self: center;
   margin: 0;

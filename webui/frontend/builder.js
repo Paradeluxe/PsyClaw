@@ -3686,7 +3686,9 @@ function t(key, vars) {
       });
 
       function isLit(id) {
-        if (allowAny) return true;
+        // ANY KEY: do NOT paint every cap red — hint text carries the meaning.
+        // All-lit red borders crush glyphs (esp. top-right ⌫ \ ]) and look like a brick.
+        if (allowAny) return false;
         id = String(id).toLowerCase();
         if (allowSet[id]) return true;
         if (id === 'space' && (allowSet[' '] || allowSet.spacebar)) return true;
@@ -3737,10 +3739,11 @@ function t(key, vars) {
 
       var root = document.createElement('div');
       root.className = 'comp-preview-stim keyboard-sim is-full'
-        + (opts.docked ? ' is-docked' : ' is-solo');
+        + (opts.docked ? ' is-docked' : ' is-solo')
+        + (allowAny ? ' is-any' : '');
 
       var hint = document.createElement('div');
-      hint.className = 'kb-hint';
+      hint.className = 'kb-hint' + (allowAny ? ' is-any' : '');
       hint.textContent = allowAny ? t('insp.anyKey') : t('insp.keys', { keys: allowed.join(' · ') });
       root.appendChild(hint);
 

@@ -202,59 +202,109 @@
   }
 
   function _summarizeInputs(list, kind) {
-    // kind: 'keyboard' | 'mouse' | undefined — collapses multi-HID noise (one physical → many Win32 rows)
+    // kind: 'keyboard' | 'mouse' — collapse multi-HID rows, label by product (VID+PID), not bare vendor
     list = list || [];
     if (!list.length) {
       return { text: t('sys.notDetected'), conn: 'other', multi: false, title: '', empty: true, status: 'info' };
     }
     function isVirtual(d) {
-      var s = ((d && d.instance_id) || '') + ' ' + ((d && d.name) || '');
-      return /GVINPUT|GameViewer|AskLink|ALBHID|ALHID|VIRTUAL|RDP|VMware|vhid|TsUsb|Citrix|Parsec|Sunshine|Virtual\s*HID/i.test(s);
+      var s = ((d && d.instance_id) || '') + ' ' + ((d && d.name) || '') + ' ' + ((d && d.manufacturer) || '');
+      return /GVINPUT|GameViewer|AskLink|ALBHID|ALHID|netease|VIRTUAL|RDP|VMware|vhid|TsUsb|Citrix|Parsec|Sunshine|Virtual\s*HID|LGHUBDEVICE/i.test(s);
     }
     function physicalKey(d) {
       var id = String((d && d.instance_id) || '');
       var m = id.match(/VID_[0-9A-F]+&PID_[0-9A-F]+/i);
       if (m) return m[0].toUpperCase();
-      // same composite root without VID (e.g. HID\FOO&COL01)
       m = id.match(/^(?:HID|USB)\\([^\\]+)/i);
       if (m) return m[1].replace(/&COL[0-9A-F]+$/i, '').toUpperCase();
       return id.toUpperCase() || String((d && d.name) || '');
     }
+    function vidPid(d) {
+      var id = String((d && d.instance_id) || '');
+      var m = id.match(/VID_([0-9A-F]{4})&PID_([0-9A-F]{4})/i);
+      if (!m) return null;
+      return { vid: m[1].toUpperCase(), pid: m[2].toUpperCase() };
+    }
     function isGenericName(n) {
       n = String(n || '').trim();
-      return !n || /^(HID-compliant\s+(mouse|device|consumer control device)|USB\s+Input\s+Device|USB\s+Pointing\s+Device|HID Keyboard Device|Enhanced \(101- or 102-key\)|Standard PS\/2 Keyboard|PS\/2 Compatible Mouse)$/i.test(n);
+      return !n || /^(HID-compliant\s+(mouse|device|consumer control device|vendor-defined device|system controller|pen)|USB\s+Input\s+Device|USB\s+Pointing\s+Device|USB\s+Composite\s+Device|HID Keyboard Device|Enhanced \(101- or 102-key\)|Standard PS\/2 Keyboard|PS\/2 Compatible Mouse)$/i.test(n);
     }
-    function vendorLabel(d) {
-      var id = String((d && d.instance_id) || '');
-      var m = id.match(/VID_([0-9A-F]{4})/i);
-      if (!m) return '';
-      var map = {
-        '046D': 'Logitech',
-        '045E': 'Microsoft',
-        '05AC': 'Apple',
-        '1532': 'Razer',
-        '0951': 'HyperX',
-        '1B1C': 'Corsair',
-        '0B05': 'ASUS',
-        '1038': 'SteelSeries',
-        '04F2': 'Chicony',
-        '0A5C': 'Broadcom',
-        '8087': 'Intel',
-        '0BDA': 'Realtek',
-      };
-      return map[m[1].toUpperCase()] || '';
+    // Product-level (not vendor-only) — Windows almost never exposes real friendly names for HID mice
+    var PRODUCT = {
+      // Logitech mice / receivers
+      '046D:C07E': 'G402',
+      '046D:C07D': 'G502',
+      '046D:C08B': 'G502 HERO',
+      '046D:C092': 'G102',
+      '046D:C093': 'G102',
+      '046D:C08C': 'G Pro Wireless',
+      '046D:C539': 'G Pro X Superlight',
+      '046D:C547': 'G Pro X Superlight 2',
+      '046D:C07C': 'G402',
+      '046D:C24A': 'G600',
+      '046D:C52B': 'Unifying',
+      '046D:C532': 'Unifying',
+      '046D:C534': 'Unifying',
+      '046D:C52F': 'G700 receiver',
+      '046D:C231': 'G HUB virtual',
+      '046D:C232': 'G HUB virtual',
+      // Microsoft
+      '045E:0040': 'Wheel Mouse Optical',
+      '045E:07A5': 'Surface mouse',
+      '045E:0745': 'Nano Transceiver',
+      // Razer common
+      '1532:0043': 'DeathAdder',
+      '1532:005C': 'DeathAdder Elite',
+      '1532:0084': 'DeathAdder V2',
+      // OEM keyboard+mouse composites (Sino Wealth etc.)
+      '258A:0195': 'KB combo',
+      '258A:002A': 'KB combo',
+      '258A:0049': 'KB combo',
+    };
+    var VENDOR = {
+      '046D': 'Logitech',
+      '045E': 'Microsoft',
+      '05AC': 'Apple',
+      '1532': 'Razer',
+      '0951': 'HyperX',
+      '1B1C': 'Corsair',
+      '0B05': 'ASUS',
+      '1038': 'SteelSeries',
+      '04F2': 'Chicony',
+      '258A': 'USB',
+      '0A5C': 'Broadcom',
+      '0BDA': 'Realtek',
+    };
+    function productLabel(d) {
+      var vp = vidPid(d);
+      if (!vp) return '';
+      var key = vp.vid + ':' + vp.pid;
+      if (PRODUCT[key]) {
+        var prod = PRODUCT[key];
+        // vendor prefix when product string has no brand
+        if (vp.vid === '046D' && !/^Logitech/i.test(prod)) return 'Logitech ' + prod;
+        if (vp.vid === '1532' && !/^Razer/i.test(prod)) return 'Razer ' + prod;
+        if (vp.vid === '045E' && !/^Microsoft|Surface/i.test(prod)) return 'Microsoft ' + prod;
+        return prod;
+      }
+      // unknown PID — still distinguishable: "Logitech C07E" not just "Logitech"
+      var v = VENDOR[vp.vid] || '';
+      if (v) return v + ' ' + vp.pid;
+      return vp.vid + ':' + vp.pid;
     }
     function shortLabel(d) {
-      var v = vendorLabel(d);
-      if (v) return v;
+      var p = productLabel(d);
+      if (p) return p;
       var n = String((d && d.name) || '').trim();
       if (!isGenericName(n)) return n;
+      var mfg = String((d && d.manufacturer) || '').trim();
+      if (mfg && !/^(Microsoft|Standard|标准|標準|\(Standard)/i.test(mfg) && !isGenericName(mfg)) return mfg;
       return '';
     }
     var real = list.filter(function (d) { return !isVirtual(d); });
     var onlyVirtual = !real.length && list.length > 0;
     var pool = real.length ? real : list;
-    // collapse HID collections → one row per physical device
+    // collapse HID collections → one row per physical VID+PID
     var byPhys = {};
     var physOrder = [];
     pool.forEach(function (d) {
@@ -263,11 +313,11 @@
         byPhys[k] = d;
         physOrder.push(k);
       } else {
-        // prefer VID entry / non-generic name
         var cur = byPhys[k];
         var score = function (x) {
           var s = 0;
           if (/VID_/i.test(x.instance_id || '')) s += 2;
+          if (productLabel(x)) s += 2;
           if (shortLabel(x)) s += 1;
           return s;
         };
@@ -278,41 +328,53 @@
       var order = { bluetooth: 0, usb: 1, ps2: 2, 'built-in': 3, other: 4 };
       var sa = order[a.connection] != null ? order[a.connection] : 5;
       var sb = order[b.connection] != null ? order[b.connection] : 5;
-      var na = /VID_/i.test(a.instance_id || '') ? 0 : 1;
-      var nb = /VID_/i.test(b.instance_id || '') ? 0 : 1;
+      // prefer named products over bare VID:PID / empty
+      var pa = productLabel(a) ? 0 : 1;
+      var pb = productLabel(b) ? 0 : 1;
       if (sa !== sb) return sa - sb;
-      return na - nb;
+      if (pa !== pb) return pa - pb;
+      return String(physicalKey(a)).localeCompare(String(physicalKey(b)));
     });
     var primary = ranked[0];
     var conn = primary.connection || 'other';
-    var labels = [];
-    ranked.forEach(function (d) {
+    // ONE label per physical device (do not collapse two Logitech products into "Logitech")
+    var labels = ranked.map(function (d) {
       var lab = shortLabel(d);
-      if (lab && labels.indexOf(lab) < 0) labels.push(lab);
+      if (lab) return lab;
+      return kind === 'keyboard' ? 'keyboard' : (kind === 'mouse' ? 'mouse' : 'device');
+    });
+    // de-dupe only exact same product string (two identical receivers)
+    var uniq = [];
+    var uniqCount = {};
+    labels.forEach(function (lab) {
+      if (!uniqCount[lab]) {
+        uniq.push(lab);
+        uniqCount[lab] = 1;
+      } else {
+        uniqCount[lab] += 1;
+      }
     });
     var nPhys = ranked.length;
-    var noun = (kind === 'keyboard')
-      ? (nPhys === 1 ? 'keyboard' : 'keyboards')
-      : (kind === 'mouse')
-        ? (nPhys === 1 ? 'mouse' : 'mice')
-        : (nPhys === 1 ? 'device' : 'devices');
-    // Compact face: USB · Logitech  |  USB · Logitech (+1)  |  USB · 2 mice
+    // Compact but distinguishable: USB · Logitech G402 · Unifying · KB combo
+    // or USB · Logitech G402 · Unifying (+1)
+    var shown = uniq.map(function (lab) {
+      return uniqCount[lab] > 1 ? (uniqCount[lab] + '× ' + lab) : lab;
+    });
+    // Show up to 3 short product labels — distinguish devices; (+N) only beyond that
     var text;
-    if (labels.length === 1 && nPhys === 1) {
-      text = _connLabel(conn) + ' · ' + labels[0];
-    } else if (labels.length === 1 && nPhys > 1) {
-      text = _connLabel(conn) + ' · ' + labels[0] + ' (+' + (nPhys - 1) + ')';
-    } else if (labels.length >= 2) {
-      text = _connLabel(conn) + ' · ' + labels.slice(0, 2).join(' · ');
-      if (nPhys > 2) text += ' (+' + (nPhys - 2) + ')';
+    if (shown.length === 0) {
+      text = _connLabel(conn);
+    } else if (shown.length <= 3) {
+      text = _connLabel(conn) + ' · ' + shown.join(' · ');
     } else {
-      // all generic names after collapse
-      text = _connLabel(conn) + ' · ' + (nPhys > 1 ? (nPhys + ' ' + noun) : noun);
+      text = _connLabel(conn) + ' · ' + shown.slice(0, 3).join(' · ') + ' (+' + (shown.length - 3) + ')';
     }
     var st = onlyVirtual ? 'warn' : 'pass';
     var titleBits = ranked.map(function (d) {
       var lab = shortLabel(d) || d.name || '?';
-      return _connLabel(d.connection) + ': ' + lab + (d.instance_id ? ' · ' + d.instance_id : '');
+      var vp = vidPid(d);
+      var idBit = vp ? ('VID_' + vp.vid + '&PID_' + vp.pid) : (d.instance_id || '');
+      return _connLabel(d.connection) + ': ' + lab + (idBit ? ' · ' + idBit : '');
     });
     if (onlyVirtual) titleBits.push('(virtual only)');
     if (list.length > nPhys) titleBits.push('(' + list.length + ' HID rows → ' + nPhys + ' physical)');

@@ -301,14 +301,16 @@ function Map-Cim($cls, $nameProp) {
     if (-not $nm) { return }
     $id = [string]($_.DeviceID)
     if (-not $id) { $id = [string]($_.PNPDeviceID) }
-    $u = ("$id $nm").ToUpper()
+    $mfg = ''
+    try { $mfg = [string]($_.Manufacturer) } catch { $mfg = '' }
+    $u = ("$id $nm $mfg").ToUpper()
     $conn = 'other'
     if ($u -match 'BTHENUM|BTHLE|BLUETOOTH|BTH\\') { $conn = 'bluetooth' }
     elseif ($u -match 'USB|HID\\VID|VID_') { $conn = 'usb' }
     elseif ($u -match 'PS2|I8042') { $conn = 'ps2' }
     elseif ($u -match 'ACPI|PNP0|SYNA|ELAN|I2C\\|MSFT0001|RMI|TOUCHPAD|TRACKPAD') { $conn = 'built-in' }
     elseif ($u -match 'HID') { $conn = 'usb' }
-    [pscustomobject]@{ name = $nm; connection = $conn; instance_id = $id }
+    [pscustomobject]@{ name = $nm; connection = $conn; instance_id = $id; manufacturer = $mfg }
   })
 }
 $kbs = Map-Cim 'Win32_Keyboard' 'Name'

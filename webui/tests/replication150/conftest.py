@@ -22,7 +22,7 @@ def valid_project(tmp_path):
             "factors": [{"name": "congruency", "levels": ["congruent", "incongruent"]}],
         },
         "trial_flow": ["fixation", "stimulus", "response"],
-        "timing": {"stimulus_ms": {"value": 500, "status": "known"}},
+        "timing": {"stimulus_ms": {"value": 500, "unit": "ms", "status": "known"}},
         "responses": [{"device": "keyboard", "keys": ["f", "j"]}],
         "trial_count": {"value": 4, "status": "known"},
         "conditions": [

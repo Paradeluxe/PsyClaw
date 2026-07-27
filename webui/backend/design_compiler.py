@@ -13,11 +13,66 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import random
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from compiler import HEADER, compile_spec
+
+
+def _validate_design_timing(design: Dict[str, Any]) -> None:
+    """Fail closed: component start/duration are seconds, never raw ms dumps."""
+    notes = design.get("design_notes") if isinstance(design.get("design_notes"), dict) else {}
+    generated = notes.get("source") == "replication150"
+    routines = design.get("routines") or []
+    if not isinstance(routines, list):
+        return
+    for ri, r in enumerate(routines):
+        if not isinstance(r, dict):
+            continue
+        comps = r.get("components") or []
+        if not isinstance(comps, list):
+            continue
+        for ci, c in enumerate(comps):
+            if not isinstance(c, dict):
+                continue
+            path = f"routines[{ri}].components[{ci}]"
+            if "duration_ms" in c or "start_ms" in c:
+                raise ValueError(
+                    f"{path} must not use duration_ms/start_ms; marker duration is seconds"
+                )
+            for field in ("start", "duration"):
+                if field not in c:
+                    continue
+                val = c[field]
+                try:
+                    num = float(val)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(
+                        f"{path}.{field} must be a number (seconds) or duration=-1"
+                    ) from exc
+                if field == "start":
+                    if not math.isfinite(num) or num < 0:
+                        raise ValueError(f"{path}.start must be finite >= 0 (seconds)")
+                    continue
+                if num == -1:
+                    continue
+                if not math.isfinite(num) or num < 0:
+                    raise ValueError(
+                        f"{path}.duration must be finite >= 0 or -1 (seconds)"
+                    )
+                if generated and num > 30:
+                    raise ValueError(
+                        f"{path}.duration={num} looks like raw ms; duration is seconds "
+                        f"(e.g. 1500ms→1.5)"
+                    )
+                if num >= 300:
+                    raise ValueError(
+                        f"{path}.duration={num}s is implausibly long; check ms/s unit mixup"
+                    )
+
+
 
 _RUNNER = r'''
 import json
@@ -1115,6 +1170,7 @@ def compile_design(
     session: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Compile design.json → experiment.py. Session comes from Run form (not PsychoPy Dlg)."""
+    _validate_design_timing(design)
     payload = json.dumps(design, ensure_ascii=False)
     sess = dict(session or {})
     # normalize keys used in runner

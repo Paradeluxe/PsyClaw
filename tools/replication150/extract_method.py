@@ -49,12 +49,18 @@ def extract_candidates_from_text(
         for m in _MS_RE.finditer(text):
             if m.group(1):
                 ms = int(m.group(1))
+                source_unit = (m.group(2) or "ms").lower()
             else:
-                ms = int(float(m.group(3)) * 1000)
+                ms = int(round(float(m.group(3)) * 1000))
+                source_unit = (m.group(4) or "s").lower()
+                if source_unit in {"s", "sec", "seconds"}:
+                    source_unit = "seconds"
             timing_candidates.append(
                 {
                     "page": page_no,
                     "value_ms": ms,
+                    "unit": "ms",
+                    "source_unit": source_unit,
                     "snippet": text[max(0, m.start() - 40) : m.end() + 40].strip(),
                     "confidence": 0.5,
                 }

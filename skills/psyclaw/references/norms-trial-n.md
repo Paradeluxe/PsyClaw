@@ -49,6 +49,8 @@ Spoken wall time: +~5–10 min (instructions/practice/breaks).
 
 Timing skeleton default: fixation 500ms → stim → response → ITI 600–1500ms jitter. Frame-lock only if fMRI/ERP/eye-tracking/TMS.
 
+**Marker write:** Method times stay in `*_ms`; component `duration` is **seconds** (`1500 ms → 1.5 s`). Open-ended = `-1`.
+
 ## Not this
 
 - ERP/fMRI floors: if user says ERP, prefer ≥40 presented/cell before reject; else behavioral defaults.  

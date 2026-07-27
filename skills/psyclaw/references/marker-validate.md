@@ -13,6 +13,7 @@ Run **in order**. Soft checks may warn; hard fails block “marker ready”.
 | 5 | **Loop kids** | Every `"kind":"loop"` has non-empty `children` and `nReps` ≥ 1 |
 | 6 | **Trial skeleton** | At least one routine used in a loop has a stimulus-like component (`text`/`image`/…) **and** a response component (`keyboard`/`slider`/…), unless user waived response |
 | 7 | **No parallel schema** | No Builder `.psyexp` as deliverable; no invented top-level keys that replace `routines`/`flow` |
+| T1 | **Timing units** | `start`/`duration` are **seconds** (`-1` = open-ended). No `duration_ms`. Generated markers: finite `duration > 30` hard-fail (e.g. `1500 ms → 1.5 s`). Validator/compiler do **not** auto-convert ambiguous values. |
 
 ## Soft warn (fix once, still may ask-run)
 

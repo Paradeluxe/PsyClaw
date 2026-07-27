@@ -4,6 +4,11 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
+from tools.replication150.timing_contract import (
+    TimingContractError,
+    milliseconds_to_seconds,
+)
+
 
 class MaterialBlocked(Exception):
     """Raised when a runnable marker requires unavailable materials."""
@@ -20,6 +25,18 @@ def _conditions(method: Dict[str, Any]) -> List[Dict[str, Any]]:
     fac = factors[0]
     name = fac.get("name") or "factor"
     return [{name: level, "corrAns": ""} for level in (fac.get("levels") or ["A"])]
+
+
+def _stimulus_seconds(method: Dict[str, Any]) -> float:
+    """Only ms→s conversion gateway for marker generation."""
+    field = (method.get("timing") or {}).get("stimulus_ms")
+    if not isinstance(field, dict):
+        raise TimingContractError("timing.stimulus_ms is required")
+    if field.get("unit") != "ms":
+        raise TimingContractError("timing.stimulus_ms.unit must be 'ms'")
+    if field.get("status") == "unknown":
+        raise TimingContractError("timing.stimulus_ms is unknown")
+    return milliseconds_to_seconds(field.get("value"))
 
 
 def build_marker(
@@ -42,15 +59,7 @@ def build_marker(
     )
 
     # Marker / PsychoPy duration is SECONDS. Method timing stores ms.
-    stim_ms = method.get("timing", {}).get("stimulus_ms")
-    if isinstance(stim_ms, dict):
-        ms_val = stim_ms.get("value")
-    else:
-        ms_val = stim_ms
-    if ms_val is None or ms_val == "":
-        duration = 1.5
-    else:
-        duration = float(ms_val) / 1000.0
+    duration = _stimulus_seconds(method)
 
     resp = (method.get("responses") or [{}])[0]
     keys = resp.get("keys") or ["space"]

@@ -245,3 +245,40 @@ def test_compile_escape_abort_is_manual_not_finished():
     assert "end_reason.json" in src
     assert "sys.exit(130)" in src
     assert 'INSTR["end_status"] = "manual"' in src or "end_status" in src
+
+
+def _minimal_design(duration=1.5, source=None):
+    d = {
+        "name": "t",
+        "display": {"size": [800, 600], "fullscreen": False},
+        "routines": [{
+            "name": "trial",
+            "components": [
+                {"id": "c1", "type": "text", "name": "stim", "start": 0, "duration": duration,
+                 "params": {"text": "X", "height": 0.05, "color": "white"}},
+                {"id": "c2", "type": "keyboard", "name": "kb", "start": 0, "duration": duration,
+                 "params": {"keys": "space", "force_end": True}},
+            ],
+        }],
+        "flow": [{
+            "kind": "loop", "name": "trials", "nReps": 1, "loopType": "sequential",
+            "conditions": [{"word": "X", "corrAns": "space"}],
+            "children": [{"kind": "routine", "routine": "trial"}],
+        }],
+    }
+    if source:
+        d["design_notes"] = {"source": source}
+    return d
+
+
+def test_compile_rejects_raw_millisecond_duration():
+    import pytest
+    design = _minimal_design(duration=1500, source="replication150")
+    with pytest.raises(ValueError, match="duration"):
+        compile_design(design)
+
+
+def test_compile_accepts_seconds_zero_and_open_ended():
+    assert "Window" in compile_design(_minimal_design(duration=1.5))
+    assert "Window" in compile_design(_minimal_design(duration=0))
+    assert "Window" in compile_design(_minimal_design(duration=-1))

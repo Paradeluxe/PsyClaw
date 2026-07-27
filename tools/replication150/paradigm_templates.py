@@ -30,6 +30,7 @@ def _base(
         "timing": {
             "stimulus_ms": {
                 "value": stimulus_ms,
+                "unit": "ms",
                 "status": "known",
                 "source": {"page": 0, "quote": "template default; replace with Method extract"},
             }

@@ -33,6 +33,7 @@ from tools.replication150.project_writer import write_project
 from tools.replication150.report import summarize
 from tools.replication150.state import ResultStore
 from tools.replication150.static_gate import validate_project
+from tools.replication150.timing_contract import TIMING_CONTRACT_VERSION
 
 # material folder name hints → dataset dir under vault/materials
 MATERIAL_HINTS = {
@@ -113,6 +114,13 @@ def _http_json(url: str, body: Optional[dict] = None, timeout: float = 60) -> di
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+
+def _ensure_method_timing(method: dict) -> list:
+    """Return timing errors; empty means OK for generation."""
+    from tools.replication150.timing_contract import validate_method_timing
+    return validate_method_timing(method.get("timing") or {})
 
 
 def material_status_for(row: dict, materials_root: Path) -> str:
@@ -517,6 +525,7 @@ def process_one(
             marker = build_marker(method, project_name=paper_id, runnable=False)
         meta = {
             "paper_id": paper_id,
+            "timing_contract_version": TIMING_CONTRACT_VERSION,
             "replication_level": "framework_only",
             "material_status": "gated",
             "run_policy": "do_not_run",
@@ -554,6 +563,7 @@ def process_one(
         marker = build_marker(method, project_name=paper_id)
         meta = {
             "paper_id": paper_id,
+            "timing_contract_version": TIMING_CONTRACT_VERSION,
             "replication_level": "framework_only",
             "material_status": "missing",
             "run_policy": "do_not_run",
@@ -572,6 +582,7 @@ def process_one(
             "paper_id": paper_id,
             "category": cat,
             "status": "blocked",
+            "timing_contract_version": TIMING_CONTRACT_VERSION,
             "replication_level": "framework_only",
             "material_status": "missing",
             "static_ok": static.get("ok"),
@@ -583,6 +594,17 @@ def process_one(
 
     # runnable path
     method = get_method(paper_id, row)
+    terr = _ensure_method_timing(method)
+    if terr:
+        rec = {
+            "paper_id": paper_id,
+            "category": cat,
+            "status": "failed",
+            "timing_contract_version": TIMING_CONTRACT_VERSION,
+            "error": terr,
+        }
+        store.append(rec)
+        return rec
     method["material_status"] = mat if mat != "unknown" else "not_applicable"
     if method.get("material_status") == "unknown":
         method["material_status"] = "not_applicable"
@@ -612,6 +634,7 @@ def process_one(
         level = "adaptation"
     meta = {
         "paper_id": paper_id,
+        "timing_contract_version": TIMING_CONTRACT_VERSION,
         "replication_level": level,
         "material_status": method.get("material_status"),
         "run_policy": "run",
@@ -648,6 +671,7 @@ def process_one(
         "paper_id": paper_id,
         "category": cat,
         "status": status,
+        "timing_contract_version": TIMING_CONTRACT_VERSION,
         "replication_level": level,
         "material_status": method.get("material_status"),
         "static_ok": static.get("ok"),
@@ -732,6 +756,7 @@ def main(argv=None) -> int:
                 "paper_id": row["paper_id"],
                 "category": row.get("category"),
                 "status": "failed",
+                "timing_contract_version": TIMING_CONTRACT_VERSION,
                 "error": f"{type(exc).__name__}: {exc}",
             }
             store.append(rec)

@@ -9,7 +9,7 @@ def complete_method_fixture():
         },
         "trial_flow": ["fixation", "stimulus", "response"],
         "timing": {
-            "stimulus_ms": {"value": 500, "page": 3, "status": "known"},
+            "stimulus_ms": {"value": 500, "unit": "ms", "page": 3, "status": "known"},
         },
         "responses": [{"device": "keyboard", "keys": ["f", "j"]}],
         "trial_count": {"value": 96, "page": 4, "status": "known"},
@@ -33,4 +33,22 @@ def test_method_record_requires_source_for_timing():
 def test_unknown_is_allowed_but_not_silent_default():
     record = complete_method_fixture()
     record["timing"]["stimulus_ms"] = {"value": None, "status": "unknown"}
+    assert validate_method_record(record) == []
+
+
+def test_method_record_requires_unit_ms():
+    record = complete_method_fixture()
+    del record["timing"]["stimulus_ms"]["unit"]
+    errors = validate_method_record(record)
+    assert any("unit must be 'ms'" in e for e in errors)
+
+
+def test_method_record_accepts_source_page_zero():
+    record = complete_method_fixture()
+    record["timing"]["stimulus_ms"] = {
+        "value": 1500,
+        "unit": "ms",
+        "status": "known",
+        "source": {"page": 0, "quote": "template default"},
+    }
     assert validate_method_record(record) == []

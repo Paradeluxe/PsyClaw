@@ -1,6 +1,7 @@
 import pytest
 
 from tools.replication150.generate_marker import MaterialBlocked, build_marker
+from tools.replication150.timing_contract import TimingContractError
 
 
 def method_fixture():
@@ -10,7 +11,7 @@ def method_fixture():
             "factors": [{"name": "congruency", "levels": ["congruent", "incongruent"]}],
         },
         "trial_flow": ["fixation", "stimulus", "response"],
-        "timing": {"stimulus_ms": {"value": 500, "status": "known"}},
+        "timing": {"stimulus_ms": {"value": 500, "unit": "ms", "status": "known"}},
         "responses": [{"device": "keyboard", "keys": ["f", "j"], "corr_field": "corrAns"}],
         "trial_count": {"value": 96, "status": "known"},
         "conditions": [
@@ -51,7 +52,7 @@ def test_stimulus_ms_converted_to_seconds_not_raw_ms():
     assert stim["duration"] == 0.5  # fixture stimulus_ms=500
     assert stim["duration"] != 500
     m1500 = method_fixture()
-    m1500["timing"] = {"stimulus_ms": {"value": 1500, "status": "known"}}
+    m1500["timing"] = {"stimulus_ms": {"value": 1500, "unit": "ms", "status": "known"}}
     stim2 = next(
         c
         for r in build_marker(m1500, project_name="x")["routines"]
@@ -60,6 +61,18 @@ def test_stimulus_ms_converted_to_seconds_not_raw_ms():
         if c.get("name") == "stim"
     )
     assert stim2["duration"] == 1.5
+
+
+def test_generator_rejects_missing_or_wrong_unit_timing():
+    missing = method_fixture()
+    missing["timing"] = {}
+    with pytest.raises(TimingContractError):
+        build_marker(missing, project_name="missing")
+
+    wrong = method_fixture()
+    wrong["timing"]["stimulus_ms"]["unit"] = "s"
+    with pytest.raises(TimingContractError):
+        build_marker(wrong, project_name="wrong")
 
 
 def test_generator_keeps_factor_and_corrans_as_condition_data():

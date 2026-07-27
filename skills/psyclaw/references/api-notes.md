@@ -23,6 +23,7 @@ PsychoPyProcess
 - Repo: `Paradeluxe/psyclaw` (webui/ subdir) · port **8876** only (not 8787)
 - Lab app is **not** a skill; companion skill is only `psyclaw`
 - Open duration canonical: **`-1`**
+- **Timing units:** Method/template: `*_ms` + `unit=ms` · marker `start` / `duration`: seconds · never copy raw ms into duration (`1500 ms → 1.5 s`)
 - Platform > named paradigms
 - Marker: **`<folderName>.psyclaw`** (webui migrates legacy `design.psyclaw`)
 

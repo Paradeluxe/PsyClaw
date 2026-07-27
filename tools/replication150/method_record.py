@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from tools.replication150.timing_contract import validate_method_timing
+
 
 _REQUIRED_TOP = ("design", "trial_flow", "timing", "responses", "trial_count", "evidence")
 
@@ -11,21 +13,19 @@ def _is_unknown_field(value: Any) -> bool:
     return isinstance(value, dict) and value.get("status") == "unknown"
 
 
+def _has_page(value: Dict[str, Any]) -> bool:
+    if "page" in value:
+        return True
+    src = value.get("source")
+    return isinstance(src, dict) and "page" in src
+
+
 def _check_timed_value(key: str, value: Any, errors: List[str]) -> None:
     path = f"timing.{key}"
     if _is_unknown_field(value):
         return
     if isinstance(value, dict):
-        if value.get("value") is None and value.get("status") != "unknown":
-            errors.append(f"{path} lacks page evidence")
-            return
-        if value.get("value") is not None and not value.get("page") and value.get("status") != "unknown":
-            # allow known with page OR explicit known with evidence list handled separately
-            if "page" not in value and value.get("status") == "known" and value.get("page") is None:
-                # still need page for non-unknown numeric
-                if "page" not in value:
-                    errors.append(f"{path} lacks page evidence")
-        if value.get("value") is not None and "page" not in value and value.get("status") != "unknown":
+        if value.get("value") is not None and not _has_page(value) and value.get("status") != "unknown":
             errors.append(f"{path} lacks page evidence")
         return
     # bare number/string without provenance
@@ -43,8 +43,11 @@ def validate_method_record(record: Dict[str, Any]) -> List[str]:
 
     timing = record.get("timing") or {}
     if isinstance(timing, dict):
+        errors.extend(validate_method_timing(timing))
         for key, value in timing.items():
             _check_timed_value(key, value, errors)
+    else:
+        errors.append("timing must be an object")
 
     trial_count = record.get("trial_count")
     if trial_count is not None and not _is_unknown_field(trial_count):

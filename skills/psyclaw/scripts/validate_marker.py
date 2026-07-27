@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -158,6 +159,52 @@ def validate(marker_path: Path, *, try_compile: bool = False) -> dict[str, Any]:
             comps = r.get("components")
             if comps is not None and not isinstance(comps, list):
                 fail("3", f"routine {rn!r} components must be array")
+
+            # T1 timing: start/duration are seconds; reject raw-ms dumps
+            if isinstance(comps, list):
+                notes = data.get("design_notes") if isinstance(data.get("design_notes"), dict) else {}
+                generated = notes.get("source") == "replication150"
+                for ci, c in enumerate(comps):
+                    if not isinstance(c, dict):
+                        continue
+                    cpath = f"routines[{i}].components[{ci}]"
+                    if "duration_ms" in c or "start_ms" in c:
+                        fail("T1", f"{cpath} must not use duration_ms/start_ms; use seconds on duration/start")
+                    for field in ("start", "duration"):
+                        if field not in c:
+                            continue
+                        val = c[field]
+                        try:
+                            num = float(val)
+                        except (TypeError, ValueError):
+                            fail("T1", f"{cpath}.{field} must be a number (seconds) or duration=-1")
+                            continue
+                        if field == "start":
+                            if not math.isfinite(num) or num < 0:
+                                fail("T1", f"{cpath}.start must be finite >= 0 (seconds); got {val!r}")
+                            continue
+                        # duration
+                        if num == -1:
+                            continue
+                        if not math.isfinite(num) or num < 0:
+                            fail("T1", f"{cpath}.duration must be finite >= 0 or -1 (seconds); got {val!r}")
+                            continue
+                        if generated and num > 30:
+                            fail(
+                                "T1",
+                                f"{cpath}.duration={num} looks like raw ms; marker duration is seconds "
+                                f"(e.g. 1500ms→1.5)",
+                            )
+                        elif num >= 300:
+                            fail(
+                                "T1",
+                                f"{cpath}.duration={num}s is implausibly long; check ms/s unit mixup",
+                            )
+                        elif num > 30:
+                            warn(
+                                "T1",
+                                f"{cpath}.duration={num}s is long; confirm intentional seconds not ms",
+                            )
 
     # 4 Routine refs + 5 Loop kids
     if isinstance(flow, list):

@@ -3083,10 +3083,10 @@ font-size: var(--fs-sm);
 }
 .flow-bracket {
   position: absolute;
-  height: 22px;
+  height: 28px;
   border: 2px solid #8a8a8a;
   border-top: none;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 20px 20px;
   background: transparent;
   pointer-events: auto;
   display: flex;
@@ -3101,9 +3101,9 @@ font-size: var(--fs-sm);
 }
 .flow-bracket.is-nested {
   border-color: #6a8ab8;
-  height: 20px;
+  height: 24px;
 }
-.flow-bracket.depth-0 {
+
   border-color: #9a9a9a;
 }
 .flow-bracket.depth-1 {
@@ -3120,7 +3120,7 @@ font-size: var(--fs-sm);
 .flow-bracket-reps,
 .flow-bracket-new-tag {
   position: relative;
-  top: 10px; /* sit on the U-bracket bottom rail */
+  top: 12px; /* sit on the U-bracket bottom rail (taller arms) */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3131,7 +3131,7 @@ font-size: var(--fs-sm);
   white-space: nowrap;
   vertical-align: middle;
 }
-.flow-bracket-label {
+
   font-family: var(--font);
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -3168,14 +3168,14 @@ font-size: var(--fs-sm);
   position: absolute;
   top: 0;
   bottom: 4px;
-  width: 8px;
+  width: 12px;
   cursor: ew-resize;
   pointer-events: auto;
   z-index: 1;
 }
-.flow-bracket-edge-l { left: -2px; }
-.flow-bracket-edge-r { right: -2px; }
-.flow-bracket-edge:hover { background: rgba(232, 33, 39, 0.18); }
+.flow-bracket-edge-l { left: -4px; }
+.flow-bracket-edge-r { right: -4px; }
+
 
 /* Draw: full final-structure ghost (not just a rubber line) */
 .flow-brackets-layer.is-previewing {

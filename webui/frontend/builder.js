@@ -3205,15 +3205,15 @@ function t(key, vars) {
                       if (!p0 || !p1) return;
                       var pr0 = p0.getBoundingClientRect();
                       var pr1 = p1.getBoundingClientRect();
-                      var left = Math.min(pr0.left, pr1.left) - tr.left;
-                      var right = Math.max(pr0.right, pr1.right) - tr.left;
+                      var left = Math.min(pr0.left, pr1.left) - tr.left - 20;
+                      var right = Math.max(pr0.right, pr1.right) - tr.left + 20;
                       var nestOffset = (md - brInfo.depth) * levelH;
                       var g = el('div', 'flow-bracket flow-bracket-ghost'
                                               + (brInfo.depth > 0 ? ' is-nested' : '')
                                               + ' depth-' + brInfo.depth
                                               + (brInfo.isNew ? ' is-new' : ' is-existing'));
                                             var spanG = Math.max(40, Math.round(right - left));
-                                            var wG = Math.max(spanG, 148);
+                                            var wG = Math.max(spanG, 176);
                                             var midG = (left + right) / 2;
                                             g.style.left = Math.round(midG - wG / 2) + 'px';
                                             g.style.width = wG + 'px';
@@ -3501,8 +3501,10 @@ function t(key, vars) {
             var r0 = n0.getBoundingClientRect();
             var r1 = n1.getBoundingClientRect();
             // relative to track; canvas scroll moves both track & pills equally
-            var left = Math.min(r0.left, r1.left) - tr.left;
-            var right = Math.max(r0.right, r1.right) - tr.left;
+            // hang ends into connector air so U-arms read larger than the pill edge
+            var endPad = 20;
+            var left = Math.min(r0.left, r1.left) - tr.left - endPad;
+            var right = Math.max(r0.right, r1.right) - tr.left + endPad;
             var nestOffset = (maxDepth - b.depth) * levelH;
             var pathSel = selectedFlowPath && selectedFlowPath.join(',') === b.path.join(',');
                         var br = el('div', 'flow-bracket'

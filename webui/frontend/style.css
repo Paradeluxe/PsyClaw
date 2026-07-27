@@ -5511,12 +5511,15 @@ flex: 1 1 auto;
 }
 .loop-cond-preview-wrap.is-wide {
   max-height: min(42vh, 420px);
-  min-height: 148px;
+  /* hug content when few rows — ban empty void under tbody */
+  min-height: 0;
+  height: fit-content;
 }
 .loop-cond-preview {
   width: 100%;
   min-width: 0;
   max-width: none;
+  height: auto;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -5524,7 +5527,7 @@ flex: 1 1 auto;
   font-size: var(--fs-sm);
   font-family: var(--font);
 }
-.loop-cond-preview.is-wide {
+
   font-size: var(--fs-14);
 }
 .loop-cond-preview col.cond-col-idx {

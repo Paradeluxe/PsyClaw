@@ -43,6 +43,25 @@ def test_generator_emits_canonical_platform_shape():
     assert "paradigm_compiler" not in marker
 
 
+def test_stimulus_ms_converted_to_seconds_not_raw_ms():
+    """Method stores ms; marker/PsychoPy duration is seconds (1500ms → 1.5)."""
+    marker = build_marker(method_fixture(), project_name="cat1_demo")
+    trial = next(r for r in marker["routines"] if r["name"] == "trial")
+    stim = next(c for c in trial["components"] if c.get("name") == "stim")
+    assert stim["duration"] == 0.5  # fixture stimulus_ms=500
+    assert stim["duration"] != 500
+    m1500 = method_fixture()
+    m1500["timing"] = {"stimulus_ms": {"value": 1500, "status": "known"}}
+    stim2 = next(
+        c
+        for r in build_marker(m1500, project_name="x")["routines"]
+        if r["name"] == "trial"
+        for c in r["components"]
+        if c.get("name") == "stim"
+    )
+    assert stim2["duration"] == 1.5
+
+
 def test_generator_keeps_factor_and_corrans_as_condition_data():
     marker = build_marker(stroop_method_fixture(), project_name="cat1_stroop")
     loop = next(n for n in marker["flow"] if n.get("kind") == "loop")

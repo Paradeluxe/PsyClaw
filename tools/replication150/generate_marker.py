@@ -41,11 +41,16 @@ def build_marker(
         needs_assets and material_status in {"missing", "gated", "licensed", "physical"}
     )
 
+    # Marker / PsychoPy duration is SECONDS. Method timing stores ms.
     stim_ms = method.get("timing", {}).get("stimulus_ms")
     if isinstance(stim_ms, dict):
-        duration = stim_ms.get("value")
+        ms_val = stim_ms.get("value")
     else:
-        duration = stim_ms
+        ms_val = stim_ms
+    if ms_val is None or ms_val == "":
+        duration = 1.5
+    else:
+        duration = float(ms_val) / 1000.0
 
     resp = (method.get("responses") or [{}])[0]
     keys = resp.get("keys") or ["space"]

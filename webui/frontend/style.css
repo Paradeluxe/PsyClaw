@@ -3103,7 +3103,7 @@ font-size: var(--fs-sm);
   border-color: #6a8ab8;
   height: 24px;
 }
-
+.flow-bracket.depth-0 {
   border-color: #9a9a9a;
 }
 .flow-bracket.depth-1 {
@@ -3131,7 +3131,7 @@ font-size: var(--fs-sm);
   white-space: nowrap;
   vertical-align: middle;
 }
-
+.flow-bracket-label {
   font-family: var(--font);
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -3175,9 +3175,8 @@ font-size: var(--fs-sm);
 }
 .flow-bracket-edge-l { left: -4px; }
 .flow-bracket-edge-r { right: -4px; }
+.flow-bracket-edge:hover { background: rgba(232, 33, 39, 0.18); }
 
-
-/* Draw: full final-structure ghost (not just a rubber line) */
 .flow-brackets-layer.is-previewing {
   opacity: 0.12;
   pointer-events: none;

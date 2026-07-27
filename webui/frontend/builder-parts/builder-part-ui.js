@@ -1565,9 +1565,9 @@
                           + (pathSel ? ' is-selected' : '')
                           + (b.depth > 0 ? ' is-nested' : '')
                           + ' depth-' + b.depth);
-            // Combined chip removed — just widen bracket so "trials ×30" fits
+            // Combined chip removed — just widen bracket so "loop_name ×N" + unwrap fit
                         var span = Math.max(40, Math.round(right - left));
-                        var minW = 148; // enough for name + ×N
+                        var minW = 176; // loop_main + ×240 + pad for absolute unwrap ×
                         var w = Math.max(span, minW);
                         var mid = (left + right) / 2;
                         br.style.left = Math.round(mid - w / 2) + 'px';

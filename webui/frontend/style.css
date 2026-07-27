@@ -2944,7 +2944,7 @@ font-size: var(--fs-sm);
 
 /* Edge: pure hairline only (Linear/Stripe — no chevron, no triangle, no double-draw). */
 .flow-connector {
-  flex: 0 0 28px;
+  flex: 0 0 40px;
   height: 1px;
   align-self: center;
   margin: 0;
@@ -3095,7 +3095,9 @@ font-size: var(--fs-sm);
   gap: 8px;
   box-sizing: border-box;
   overflow: visible;
-  min-width: 132px; /* room for "trials ×30" */
+  /* room for "loop_main" + "×240" + unwrap hit — avoid absolute × eating last digit */
+  min-width: 168px;
+  padding: 0 22px 0 10px;
 }
 .flow-bracket.is-nested {
   border-color: #6a8ab8;
@@ -3149,7 +3151,7 @@ font-size: var(--fs-sm);
 }
 .flow-bracket-x {
   position: absolute;
-  right: 4px;
+  right: 2px;
   bottom: -6px;
   border: 0;
   background: #0a0a0a;

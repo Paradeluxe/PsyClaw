@@ -435,7 +435,7 @@
   function getDesign() { return design; }
     function setDesign(d, opts) {
           opts = opts || {};
-          design = ensureDisplay(d || defaultDesign());
+          design = normalizeDesignTiming(ensureDisplay(d || defaultDesign()));
           routineEditMode = false;
           clearRoutineLongPress();
           if (design && design.routines && design.routines.length) {

@@ -268,11 +268,38 @@ function t(key, vars) {
 
   var SNAP = 0.05; // default grid when snap ON
         var OPEN_DISPLAY = 3; // open-ended (∞) bar visual duration on timeline
-        var OPEN_DURATION = -1; // design.json duration for open-ended (∞)
+        var OPEN_DURATION = -1; // design.json duration ONLY for open-ended (∞)
+        // start is always finite seconds >= 0 — never -1 / never ∞
+        function clampStart(v) {
+          var n = Number(v);
+          if (!isFinite(n) || n < 0) return 0;
+          return Math.round(n * 1000) / 1000;
+        }
         function isOpenDuration(d) {
-          if (d == null || d === '') return true; // legacy null/''
+          // ONLY duration may be open. null/'' legacy → open. negative → open.
+          // start must never go through this helper.
+          if (d == null || d === '') return true;
           var n = Number(d);
-          return !isNaN(n) && n === OPEN_DURATION;
+          return isFinite(n) && n < 0;
+        }
+        function normalizeComponentTiming(c) {
+          if (!c || typeof c !== 'object') return c;
+          c.start = clampStart(c.start);
+          if (isOpenDuration(c.duration)) {
+            c.duration = OPEN_DURATION;
+          } else {
+            var d = Number(c.duration);
+            if (!isFinite(d) || d < 0) c.duration = OPEN_DURATION;
+            else c.duration = Math.round(d * 1000) / 1000;
+          }
+          return c;
+        }
+        function normalizeDesignTiming(d) {
+          if (!d || !d.routines) return d;
+          d.routines.forEach(function (r) {
+            (r.components || []).forEach(normalizeComponentTiming);
+          });
+          return d;
         }
         var TIMELINE_PAD = 1; // scale end = longest edge + this
         var snapEnabled = true;
@@ -783,7 +810,7 @@ function t(key, vars) {
   function getDesign() { return design; }
     function setDesign(d, opts) {
           opts = opts || {};
-          design = ensureDisplay(d || defaultDesign());
+          design = normalizeDesignTiming(ensureDisplay(d || defaultDesign()));
           routineEditMode = false;
           clearRoutineLongPress();
           if (design && design.routines && design.routines.length) {
@@ -2273,22 +2300,23 @@ function t(key, vars) {
           return t;
         }
 
+        /** Finite clock label only. Never prints ∞ — open end is barLabel's job. */
         function formatTime(t) {
-      if (t == null || t === '') return '∞';
       var n = Number(t);
-      if (isNaN(n)) return '—';
+      // missing / invalid / negative → 0 (start cannot be -1 or ∞)
+      if (t == null || t === '' || !isFinite(n) || n < 0) n = 0;
       if (Math.abs(n - Math.round(n * 1000) / 1000) < 1e-9) {
-        // trim trailing zeros
         return (Math.round(n * 1000) / 1000).toString();
       }
       return n.toFixed(3);
     }
 
     function barLabel(c) {
-          var s = formatTime(c.start);
+          var s0 = clampStart(c && c.start);
+          var s = formatTime(s0);
           var e = isOpenDuration(c.duration)
             ? '∞'
-            : formatTime((Number(c.start) || 0) + Number(c.duration));
+            : formatTime(s0 + Math.max(0, Number(c.duration) || 0));
           return s + '–' + e + 's';
         }
 
@@ -5168,11 +5196,13 @@ function t(key, vars) {
     startIn.type = 'number';
     startIn.step = '0.001';
     startIn.min = '0';
-    startIn.value = c.start == null ? '0' : String(c.start);
+    // start is onset only — never -1 / never open-ended
+    startIn.min = '0';
+    startIn.value = String(clampStart(c.start));
+    startIn.title = t('insp.startTitle') || 'Onset seconds (>= 0). Not -1.';
     startIn.addEventListener('change', function () {
-      var v = parseFloat(startIn.value);
-      if (isNaN(v) || v < 0) v = 0;
-      c.start = Math.round(v * 1000) / 1000;
+      c.start = clampStart(startIn.value);
+      startIn.value = String(c.start);
       renderTimeline();
       refreshPreviewIfVisible(c);
       renderJsonPreview();
@@ -5380,8 +5410,11 @@ function t(key, vars) {
     else val = input.value;
 
     if (key === 'name') c.name = val;
-    else if (key === 'start') c.start = val == null ? 0 : val;
-    else if (key === 'duration') c.duration = val;
+    else if (key === 'start') c.start = clampStart(val);
+    else if (key === 'duration') {
+      if (val == null || val === '' || !isFinite(Number(val)) || Number(val) < 0) c.duration = OPEN_DURATION;
+      else c.duration = Math.round(Number(val) * 1000) / 1000;
+    }
     else if (key.indexOf('param:') === 0) {
       var pk = key.slice(6);
       c.params[pk] = val;

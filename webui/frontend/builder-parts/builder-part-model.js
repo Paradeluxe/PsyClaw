@@ -254,11 +254,38 @@ function t(key, vars) {
 
   var SNAP = 0.05; // default grid when snap ON
         var OPEN_DISPLAY = 3; // open-ended (∞) bar visual duration on timeline
-        var OPEN_DURATION = -1; // design.json duration for open-ended (∞)
+        var OPEN_DURATION = -1; // design.json duration ONLY for open-ended (∞)
+        // start is always finite seconds >= 0 — never -1 / never ∞
+        function clampStart(v) {
+          var n = Number(v);
+          if (!isFinite(n) || n < 0) return 0;
+          return Math.round(n * 1000) / 1000;
+        }
         function isOpenDuration(d) {
-          if (d == null || d === '') return true; // legacy null/''
+          // ONLY duration may be open. null/'' legacy → open. negative → open.
+          // start must never go through this helper.
+          if (d == null || d === '') return true;
           var n = Number(d);
-          return !isNaN(n) && n === OPEN_DURATION;
+          return isFinite(n) && n < 0;
+        }
+        function normalizeComponentTiming(c) {
+          if (!c || typeof c !== 'object') return c;
+          c.start = clampStart(c.start);
+          if (isOpenDuration(c.duration)) {
+            c.duration = OPEN_DURATION;
+          } else {
+            var d = Number(c.duration);
+            if (!isFinite(d) || d < 0) c.duration = OPEN_DURATION;
+            else c.duration = Math.round(d * 1000) / 1000;
+          }
+          return c;
+        }
+        function normalizeDesignTiming(d) {
+          if (!d || !d.routines) return d;
+          d.routines.forEach(function (r) {
+            (r.components || []).forEach(normalizeComponentTiming);
+          });
+          return d;
         }
         var TIMELINE_PAD = 1; // scale end = longest edge + this
         var snapEnabled = true;

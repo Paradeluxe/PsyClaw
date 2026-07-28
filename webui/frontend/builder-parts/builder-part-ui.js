@@ -329,22 +329,23 @@
           return t;
         }
 
+        /** Finite clock label only. Never prints ∞ — open end is barLabel's job. */
         function formatTime(t) {
-      if (t == null || t === '') return '∞';
       var n = Number(t);
-      if (isNaN(n)) return '—';
+      // missing / invalid / negative → 0 (start cannot be -1 or ∞)
+      if (t == null || t === '' || !isFinite(n) || n < 0) n = 0;
       if (Math.abs(n - Math.round(n * 1000) / 1000) < 1e-9) {
-        // trim trailing zeros
         return (Math.round(n * 1000) / 1000).toString();
       }
       return n.toFixed(3);
     }
 
     function barLabel(c) {
-          var s = formatTime(c.start);
+          var s0 = clampStart(c && c.start);
+          var s = formatTime(s0);
           var e = isOpenDuration(c.duration)
             ? '∞'
-            : formatTime((Number(c.start) || 0) + Number(c.duration));
+            : formatTime(s0 + Math.max(0, Number(c.duration) || 0));
           return s + '–' + e + 's';
         }
 

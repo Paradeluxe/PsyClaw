@@ -213,6 +213,7 @@
       'flow.weightNameReserved': 'Column name "weight" is reserved for loopType=weighted',
       'insp.timing': 'Timing (exact)',
       'insp.start': 'Start (s)',
+      'insp.startTitle': 'Onset in seconds (>= 0). Never -1 — use Duration -1 for ∞.',
       'insp.duration': 'Duration (s)',
       'insp.durationPh': '-1 = ∞',
       'insp.durationTitle': 'Finite seconds, or -1 for open-ended (∞)',

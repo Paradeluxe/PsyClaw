@@ -1390,11 +1390,13 @@
     startIn.type = 'number';
     startIn.step = '0.001';
     startIn.min = '0';
-    startIn.value = c.start == null ? '0' : String(c.start);
+    // start is onset only — never -1 / never open-ended
+    startIn.min = '0';
+    startIn.value = String(clampStart(c.start));
+    startIn.title = t('insp.startTitle') || 'Onset seconds (>= 0). Not -1.';
     startIn.addEventListener('change', function () {
-      var v = parseFloat(startIn.value);
-      if (isNaN(v) || v < 0) v = 0;
-      c.start = Math.round(v * 1000) / 1000;
+      c.start = clampStart(startIn.value);
+      startIn.value = String(c.start);
       renderTimeline();
       refreshPreviewIfVisible(c);
       renderJsonPreview();
@@ -1602,8 +1604,11 @@
     else val = input.value;
 
     if (key === 'name') c.name = val;
-    else if (key === 'start') c.start = val == null ? 0 : val;
-    else if (key === 'duration') c.duration = val;
+    else if (key === 'start') c.start = clampStart(val);
+    else if (key === 'duration') {
+      if (val == null || val === '' || !isFinite(Number(val)) || Number(val) < 0) c.duration = OPEN_DURATION;
+      else c.duration = Math.round(Number(val) * 1000) / 1000;
+    }
     else if (key.indexOf('param:') === 0) {
       var pk = key.slice(6);
       c.params[pk] = val;

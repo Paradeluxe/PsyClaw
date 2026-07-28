@@ -340,3 +340,88 @@ def test_flow_spacing_expands_only_for_crowded_loop_labels(live_app_url: str) ->
         assert responsive["flowScrollable"] is True, responsive
         assert responsive["maxConnector"] <= 120, responsive
         browser.close()
+
+
+def test_start_never_open_ended(live_app_url: str) -> None:
+    """start is onset >=0; only duration may be -1 / ∞."""
+    from pathlib import Path
+
+    playwright = pytest.importorskip("playwright.sync_api")
+    chrome = _browser_executable()
+    if chrome is None:
+        pytest.skip("Chrome/Edge not found")
+
+    example = Path(__file__).resolve().parent / "example_experiment"
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, executable_path=chrome)
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        page.goto(live_app_url, wait_until="networkidle", timeout=30_000)
+        page.evaluate(
+            "([k, v]) => localStorage.setItem(k, JSON.stringify(v))",
+            [
+                "psyclaw.recentProjects",
+                [{"path": str(example), "name": "example_experiment"}],
+            ],
+        )
+        page.reload(wait_until="networkidle", timeout=30_000)
+        page.wait_for_function("() => document.body.classList.contains('has-project')")
+        page.locator('.tab-btn[data-tab="flow"]').click()
+        page.wait_for_timeout(200)
+        bad = {
+            "name": "start_clamp",
+            "routines": [
+                {
+                    "name": "r1",
+                    "components": [
+                        {
+                            "id": "a",
+                            "type": "text",
+                            "name": "bad_start",
+                            "start": -1,
+                            "duration": 0.5,
+                            "params": {"text": "x"},
+                        },
+                        {
+                            "id": "b",
+                            "type": "keyboard",
+                            "name": "open_dur",
+                            "start": 0.2,
+                            "duration": -1,
+                            "params": {"keys": "space"},
+                        },
+                        {
+                            "id": "c",
+                            "type": "text",
+                            "name": "missing_start",
+                            "duration": 1,
+                            "params": {"text": "y"},
+                        },
+                    ],
+                }
+            ],
+            "flow": [{"kind": "routine", "routine": "r1"}],
+        }
+        page.evaluate("d => PsyClawBuilder.setDesign(d,{clean:true})", bad)
+        page.wait_for_timeout(250)
+        metrics = page.evaluate(
+            """() => {
+              const d = PsyClawBuilder.getDesign();
+              const comps = (d.routines[0].components || []).map(c => ({
+                name: c.name, start: c.start, duration: c.duration,
+              }));
+              const labels = [...document.querySelectorAll('.bar-range')].map(el => el.textContent.trim());
+              return { comps, labels };
+            }"""
+        )
+        browser.close()
+
+    by = {c["name"]: c for c in metrics["comps"]}
+    assert by["bad_start"]["start"] == 0, metrics
+    assert by["bad_start"]["duration"] == 0.5, metrics
+    assert by["open_dur"]["start"] == 0.2, metrics
+    assert by["open_dur"]["duration"] == -1, metrics
+    assert by["missing_start"]["start"] == 0, metrics
+    assert by["missing_start"]["duration"] == 1, metrics
+    assert any(x.startswith("0–") or x.startswith("0.2–") for x in metrics["labels"]), metrics
+    assert any("∞" in x for x in metrics["labels"]), metrics
+    assert not any(x.startswith("∞") for x in metrics["labels"]), metrics

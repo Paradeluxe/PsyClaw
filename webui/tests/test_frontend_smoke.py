@@ -215,3 +215,126 @@ def test_run_mode_controls_are_readable_in_both_languages(
             assert autopilot.evaluate("el => el.scrollWidth <= el.clientWidth + 1")
             page.close()
         browser.close()
+
+
+def test_flow_spacing_expands_only_for_crowded_loop_labels(live_app_url: str) -> None:
+    playwright = pytest.importorskip("playwright.sync_api")
+    executable = _browser_executable()
+    if not executable:
+        pytest.skip("Chrome/Edge executable not available")
+
+    project = ROOT / "tests" / "example_experiment"
+    design = {
+        "name": "flow_spacing_probe",
+        "routines": [
+            {"name": name, "components": []}
+            for name in ("intro", "practice", "trial", "feedback", "thanks")
+        ],
+        "flow": [
+            {"kind": "routine", "routine": "intro"},
+            {
+                "kind": "loop",
+                "name": "loop_practice_with_a_long_readable_name",
+                "nReps": 16,
+                "children": [
+                    {"kind": "routine", "routine": "practice"},
+                    {"kind": "routine", "routine": "trial"},
+                ],
+            },
+            {"kind": "routine", "routine": "feedback"},
+            {
+                "kind": "loop",
+                "name": "loop_end",
+                "nReps": 2,
+                "children": [{"kind": "routine", "routine": "thanks"}],
+            },
+        ],
+    }
+
+    with playwright.sync_playwright() as runner:
+        browser = runner.chromium.launch(headless=True, executable_path=executable)
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        page.goto(live_app_url, wait_until="networkidle", timeout=30_000)
+        page.evaluate(
+            "([key, value]) => localStorage.setItem(key, JSON.stringify(value))",
+            [
+                "psyclaw.recentProjects",
+                [{"path": str(project), "name": "example_experiment"}],
+            ],
+        )
+        page.reload(wait_until="networkidle", timeout=30_000)
+        page.wait_for_function(
+            "() => document.body.classList.contains('has-project')", timeout=15_000
+        )
+        page.locator('.tab-btn[data-tab="flow"]').click()
+        page.evaluate(
+            "design => window.PsyClawBuilder.setDesign(design, {clean: true})",
+            design,
+        )
+        page.wait_for_timeout(200)
+
+        metrics = page.evaluate(
+            """() => {
+              const pills = [...document.querySelectorAll('.flow-pill')];
+              const connectors = [...document.querySelectorAll('.flow-connector')];
+              const brackets = [...document.querySelectorAll('.flow-bracket')];
+              const rect = (el) => el.getBoundingClientRect();
+              const longBracket = brackets.find((el) =>
+                (el.querySelector('.flow-bracket-label')?.textContent || '')
+                  .includes('long_readable_name'));
+              const shortBracket = brackets.find((el) =>
+                (el.querySelector('.flow-bracket-label')?.textContent || '') === 'loop_end');
+              if (!longBracket || !shortBracket || pills.length < 5) {
+                return { error: 'missing geometry', pillN: pills.length, bracketN: brackets.length };
+              }
+              const labelRect = rect(longBracket.querySelector('.flow-bracket-label'));
+              const repsRect = rect(longBracket.querySelector('.flow-bracket-reps'));
+              const unwrapRect = rect(longBracket.querySelector('.flow-bracket-x'));
+              const connectorState = connectors.map((el) => ({
+                base: Number(el.dataset.baseWidth || 0),
+                width: rect(el).width,
+              }));
+              return {
+                documentOverflow: document.documentElement.scrollWidth - innerWidth,
+                connectorState,
+                connectorWidths: connectorState.map((c) => c.width),
+                longContentLeft: Math.min(labelRect.left, repsRect.left),
+                longContentRight: Math.max(labelRect.right, repsRect.right, unwrapRect.right),
+                leftNeighborRight: rect(pills[0]).right,
+                rightNeighborLeft: rect(pills[3]).left,
+                longBracketWidth: rect(longBracket).width,
+                shortBracketWidth: rect(shortBracket).width,
+              };
+            }"""
+        )
+        assert "error" not in metrics, metrics
+        assert metrics["documentOverflow"] == 0, metrics
+        assert all(item["base"] == 32 for item in metrics["connectorState"]), metrics
+        widths = [item["width"] for item in metrics["connectorState"]]
+        assert max(widths) > 32, metrics
+        # short loop may need a few px for unwrap; long loop gaps must open more
+        assert min(widths) <= 40, metrics
+        assert max(widths) - min(widths) >= 16, metrics
+        expanded = [w for w in widths if w >= max(widths) - 1]
+        assert expanded and max(expanded) - min(expanded) <= 1, metrics
+        assert metrics["longContentLeft"] >= metrics["leftNeighborRight"] + 4, metrics
+        assert metrics["longContentRight"] <= metrics["rightNeighborLeft"] - 4, metrics
+        assert metrics["shortBracketWidth"] < metrics["longBracketWidth"], metrics
+
+        page.set_viewport_size({"width": 800, "height": 700})
+        page.wait_for_timeout(200)
+        responsive = page.evaluate(
+            """() => {
+              const canvas = document.querySelector('.flow-canvas');
+              const connectors = [...document.querySelectorAll('.flow-connector')];
+              return {
+                documentOverflow: document.documentElement.scrollWidth - innerWidth,
+                flowScrollable: canvas.scrollWidth > canvas.clientWidth,
+                maxConnector: Math.max(0, ...connectors.map((el) => el.getBoundingClientRect().width)),
+              };
+            }"""
+        )
+        assert responsive["documentOverflow"] == 0, responsive
+        assert responsive["flowScrollable"] is True, responsive
+        assert responsive["maxConnector"] <= 96, responsive
+        browser.close()

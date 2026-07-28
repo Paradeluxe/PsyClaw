@@ -3001,6 +3001,133 @@ function t(key, vars) {
           return best;
         }
 
+
+        // U-arm ends: in the gap next to covered routines, close to the pill
+                // (not full midpoint — user: 太远). Stay inside the connector.
+                function bracketArmEnds(leafStart, leafEnd, tr) {
+                  var n0 = pillByLeaf(leafStart);
+                  var n1 = pillByLeaf(leafEnd);
+                  if (!n0 || !n1) return null;
+                  var r0 = n0.getBoundingClientRect();
+                  var r1 = n1.getBoundingClientRect();
+                  var rowR = pillsRow.getBoundingClientRect();
+                  // how far into the gap from the covered pill edge (px + fraction)
+                  function armFromInner(innerEdge, outerEdge, towardPrev) {
+                    var gap = Math.abs(outerEdge - innerEdge);
+                    var inset = Math.max(4, Math.min(10, gap * 0.28));
+                    return towardPrev ? (innerEdge - inset) : (innerEdge + inset);
+                  }
+                  var leftPx;
+                  var rightPx;
+                  if (leafStart > 0) {
+                    var prev = pillByLeaf(leafStart - 1);
+                    if (prev) {
+                      var rp = prev.getBoundingClientRect();
+                      leftPx = armFromInner(r0.left, rp.right, true) - tr.left;
+                    } else {
+                      leftPx = armFromInner(r0.left, rowR.left, true) - tr.left;
+                    }
+                  } else {
+                    leftPx = armFromInner(r0.left, Math.min(rowR.left, r0.left - 16), true) - tr.left;
+                  }
+                  if (leafEnd < leaves.length - 1) {
+                    var next = pillByLeaf(leafEnd + 1);
+                    if (next) {
+                      var rn = next.getBoundingClientRect();
+                      rightPx = armFromInner(r1.right, rn.left, false) - tr.left;
+                    } else {
+                      rightPx = armFromInner(r1.right, rowR.right, false) - tr.left;
+                    }
+                  } else {
+                    rightPx = armFromInner(r1.right, Math.max(rowR.right, r1.right + 16), false) - tr.left;
+                  }
+                  if (!(isFinite(leftPx) && isFinite(rightPx)) || rightPx - leftPx < 24) {
+                    leftPx = Math.min(r0.left, r1.left) - tr.left - 8;
+                    rightPx = Math.max(r0.right, r1.right) - tr.left + 8;
+                  }
+                  return { left: leftPx, right: rightPx };
+                }
+
+        var FLOW_CONNECTOR_BASE = 32;
+        var FLOW_CONNECTOR_MAX = 96;
+        var FLOW_LABEL_CLEARANCE = 8;
+
+        function connectorByGap(gapIndex) {
+          return pillsRow.querySelector('.flow-connector[data-gap="' + gapIndex + '"]');
+        }
+
+        function setConnectorWidth(connector, width) {
+          if (!connector) return;
+          var next = Math.max(FLOW_CONNECTOR_BASE, Math.min(FLOW_CONNECTOR_MAX, Math.ceil(width)));
+          connector.dataset.baseWidth = String(FLOW_CONNECTOR_BASE);
+          connector.style.flex = '0 0 ' + next + 'px';
+          connector.style.flexBasis = next + 'px';
+          connector.style.width = next + 'px';
+          connector.style.maxWidth = FLOW_CONNECTOR_MAX + 'px';
+        }
+
+        function resetConnectorWidths() {
+          Array.prototype.forEach.call(
+            pillsRow.querySelectorAll('.flow-connector'),
+            function (connector) { setConnectorWidth(connector, FLOW_CONNECTOR_BASE); }
+          );
+        }
+
+        function measureBracketContentWidth(bracket) {
+          if (!bracket) return 0;
+          var label = bracket.querySelector('.flow-bracket-label');
+          var reps = bracket.querySelector('.flow-bracket-reps');
+          var unwrap = bracket.querySelector('.flow-bracket-x');
+          if (!label) return 0;
+          var left = label.getBoundingClientRect().left;
+          var right = label.getBoundingClientRect().right;
+          if (reps) {
+            var rr = reps.getBoundingClientRect();
+            left = Math.min(left, rr.left);
+            right = Math.max(right, rr.right);
+          }
+          if (unwrap) {
+            var ur = unwrap.getBoundingClientRect();
+            left = Math.min(left, ur.left);
+            right = Math.max(right, ur.right);
+          }
+          // real painted content span + small air; no double-count pad/gap
+          return Math.ceil(right - left + FLOW_LABEL_CLEARANCE * 2);
+        }
+
+        function connectorGapIndexesForLoop(info) {
+          var indexes = [];
+          if (info.leafStart > 0) indexes.push(info.leafStart - 1);
+          for (var gi = info.leafStart; gi < info.leafEnd; gi++) indexes.push(gi);
+          if (info.leafEnd < leaves.length - 1) indexes.push(info.leafEnd);
+          return indexes;
+        }
+
+        function adaptRoutineSpacing() {
+          resetConnectorWidths();
+          if (!brackets.length || !leaves.length) return;
+          var tr = track.getBoundingClientRect();
+          brackets.forEach(function (info) {
+            var selector = '.flow-bracket[data-flow-path="' + info.path.join(',') + '"]';
+            var bracket = bracketsLayer.querySelector(selector);
+            if (!bracket) return;
+            var ends = bracketArmEnds(info.leafStart, info.leafEnd, tr);
+            if (!ends) return;
+            var available = Math.max(0, ends.right - ends.left);
+            var needed = measureBracketContentWidth(bracket);
+            var extra = Math.max(0, needed - available);
+            var gaps = connectorGapIndexesForLoop(info);
+            if (!extra || !gaps.length) return;
+            var addPerGap = Math.ceil(extra / gaps.length);
+            gaps.forEach(function (gapIndex) {
+              var connector = connectorByGap(gapIndex);
+              if (!connector) return;
+              var current = connector.getBoundingClientRect().width || FLOW_CONNECTOR_BASE;
+              setConnectorWidth(connector, current + addPerGap);
+            });
+          });
+        }
+
         /** Shared: where a leaf range would nest (parent path + depth).
                  *
                  *  SPECIAL RULE: if the selected leaves exactly fill all children
@@ -3166,7 +3293,7 @@ function t(key, vars) {
           });
 
           var preview = previewAfterWrap(a, b);
-          var levelH = 26; // slight room under arc for name + ×N
+          var levelH = 22; // room under arc for name + ×N
 
           if (!preview.ok) {
             // invalid: faint rubber only
@@ -3196,26 +3323,21 @@ function t(key, vars) {
                     var tr = track.getBoundingClientRect();
                     var rowR = pillsRow.getBoundingClientRect();
                     var baseTop = Math.max(36, Math.round(rowR.bottom - tr.top + 6));
-                    var levelH = 26; // slight room under arc for name + ×N
+                    var levelH = 22; // room under arc for name + ×N
 
                     walked.brackets.forEach(function (brInfo) {
                       // map preview leaf indices → live pill positions (leaf order unchanged by wrap)
-                      var p0 = pillByLeaf(brInfo.leafStart);
-                      var p1 = pillByLeaf(brInfo.leafEnd);
-                      if (!p0 || !p1) return;
-                      var pr0 = p0.getBoundingClientRect();
-                      var pr1 = p1.getBoundingClientRect();
-                      var left = Math.min(pr0.left, pr1.left) - tr.left - 20;
-                      var right = Math.max(pr0.right, pr1.right) - tr.left + 20;
+                      var endsG = bracketArmEnds(brInfo.leafStart, brInfo.leafEnd, tr);
+                      if (!endsG) return;
+                      var left = endsG.left;
+                      var right = endsG.right;
                       var nestOffset = (md - brInfo.depth) * levelH;
                       var g = el('div', 'flow-bracket flow-bracket-ghost'
                                               + (brInfo.depth > 0 ? ' is-nested' : '')
                                               + ' depth-' + brInfo.depth
                                               + (brInfo.isNew ? ' is-new' : ' is-existing'));
-                                            var spanG = Math.max(40, Math.round(right - left));
-                                            var wG = Math.max(spanG, 176);
-                                            var midG = (left + right) / 2;
-                                            g.style.left = Math.round(midG - wG / 2) + 'px';
+                                            var wG = Math.max(40, Math.round(right - left));
+                                            g.style.left = Math.round(left) + 'px';
                                             g.style.width = wG + 'px';
                                             g.style.top = (baseTop + nestOffset) + 'px';
                                             var lab = el('span', 'flow-bracket-label', escapeHtml(brInfo.name));
@@ -3334,6 +3456,9 @@ function t(key, vars) {
                   if (leafIdx > 0) {
                     var conn = el('div', 'flow-connector');
                     conn.setAttribute('aria-hidden', 'true');
+                    conn.dataset.gap = String(leafIdx - 1);
+                    conn.dataset.baseWidth = String(FLOW_CONNECTOR_BASE);
+                    setConnectorWidth(conn, FLOW_CONNECTOR_BASE);
                     pillsRow.appendChild(conn);
                   }
                   var top = design.flow[leaf.topIndex];
@@ -3473,8 +3598,8 @@ function t(key, vars) {
         }
 
     // ---- place brackets under pills (after layout) ----
-        function placeBrackets() {
-          bracketsLayer.innerHTML = '';
+            function placeBrackets() {
+              bracketsLayer.innerHTML = '';
           // never leave draw ghosts stuck
           if (previewLayer) {
             previewLayer.hidden = true;
@@ -3492,35 +3617,28 @@ function t(key, vars) {
           var rowR = pillsRow.getBoundingClientRect();
           // anchor under the real pill row (not a magic 44px)
           var baseTop = Math.max(36, Math.round(rowR.bottom - tr.top + 6));
-          var levelH = 26; // slight room under arc for name + ×N
+          var levelH = 22; // room under arc for name + ×N
 
           brackets.forEach(function (b) {
-            var n0 = pillByLeaf(b.leafStart);
-            var n1 = pillByLeaf(b.leafEnd);
-            if (!n0 || !n1) return;
-            var r0 = n0.getBoundingClientRect();
-            var r1 = n1.getBoundingClientRect();
-            // relative to track; canvas scroll moves both track & pills equally
-            // hang ends into connector air so U-arms read larger than the pill edge
-            var endPad = 20;
-            var left = Math.min(r0.left, r1.left) - tr.left - endPad;
-            var right = Math.max(r0.right, r1.right) - tr.left + endPad;
+            var ends = bracketArmEnds(b.leafStart, b.leafEnd, tr);
+            if (!ends) return;
+            var left = ends.left;
+            var right = ends.right;
             var nestOffset = (maxDepth - b.depth) * levelH;
             var pathSel = selectedFlowPath && selectedFlowPath.join(',') === b.path.join(',');
                         var br = el('div', 'flow-bracket'
                           + (pathSel ? ' is-selected' : '')
                           + (b.depth > 0 ? ' is-nested' : '')
                           + ' depth-' + b.depth);
-            // Combined chip removed — just widen bracket so "loop_name ×N" + unwrap fit
-                        var span = Math.max(40, Math.round(right - left));
-                        var minW = 176; // loop_main + ×240 + pad for absolute unwrap ×
-                        var w = Math.max(span, minW);
-                        var mid = (left + right) / 2;
-                        br.style.left = Math.round(mid - w / 2) + 'px';
+            // Width = geometric arm span only — do not center-expand with minW
+            // (that pulled U-ends off the connector midpoints).
+                        var w = Math.max(40, Math.round(right - left));
+                        br.style.left = Math.round(left) + 'px';
                         br.style.width = w + 'px';
                         br.style.top = (baseTop + nestOffset) + 'px';
                         br.dataset.topIndex = String(b.topIndex);
                         br.dataset.depth = String(b.depth);
+                        br.dataset.flowPath = b.path.join(',');
 
                         var lab = el('span', 'flow-bracket-label', escapeHtml(b.name));
                         var nR = (isFinite(b.nReps) && b.nReps >= 1) ? b.nReps : 1;
@@ -3609,18 +3727,24 @@ function t(key, vars) {
         }
 
         // place after paint; also keep aligned on scroll/resize
+        function layoutFlowGeometry() {
+          placeBrackets();
+          adaptRoutineSpacing();
+          placeBrackets();
+        }
+
         function scheduleBrackets() {
           requestAnimationFrame(function () {
-            placeBrackets();
-            requestAnimationFrame(placeBrackets);
+            layoutFlowGeometry();
+            requestAnimationFrame(layoutFlowGeometry);
           });
-          setTimeout(placeBrackets, 0);
-          setTimeout(placeBrackets, 50);
+          setTimeout(layoutFlowGeometry, 0);
+          setTimeout(layoutFlowGeometry, 50);
         }
         scheduleBrackets();
 
         // canvas is the horizontal scrollport — re-anchor brackets when it moves
-        var relayout = function () { placeBrackets(); };
+        var relayout = function () { layoutFlowGeometry(); };
         canvas.addEventListener('scroll', relayout, { passive: true });
         if (typeof ResizeObserver !== 'undefined') {
           var ro = new ResizeObserver(relayout);

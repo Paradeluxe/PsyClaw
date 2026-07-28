@@ -2909,6 +2909,7 @@ font-size: var(--fs-sm);
   min-width: 0;
   overflow-x: auto;
   overflow-y: visible;
+  overscroll-behavior-x: contain;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -2944,7 +2945,8 @@ font-size: var(--fs-sm);
 
 /* Edge: pure hairline only (Linear/Stripe — no chevron, no triangle, no double-draw). */
 .flow-connector {
-  flex: 0 0 64px;
+  flex: 0 0 32px;
+  max-width: 96px;
   height: 1px;
   align-self: center;
   margin: 0;
@@ -3083,10 +3085,10 @@ font-size: var(--fs-sm);
 }
 .flow-bracket {
   position: absolute;
-  height: 28px;
+  height: 20px;
   border: 2px solid #8a8a8a;
   border-top: none;
-  border-radius: 0 0 20px 20px;
+  border-radius: 0 0 6px 6px;
   background: transparent;
   pointer-events: auto;
   display: flex;
@@ -3095,13 +3097,13 @@ font-size: var(--fs-sm);
   gap: 8px;
   box-sizing: border-box;
   overflow: visible;
-  /* room for "loop_main" + "×240" + unwrap hit — avoid absolute × eating last digit */
-  min-width: 168px;
-  padding: 0 22px 0 10px;
+  /* width comes from JS arm midpoints — ban min-width that shifts U-ends */
+  min-width: 0;
+  padding: 0 14px 0 6px;
 }
 .flow-bracket.is-nested {
   border-color: #6a8ab8;
-  height: 24px;
+  height: 18px;
 }
 .flow-bracket.depth-0 {
   border-color: #9a9a9a;
@@ -3120,14 +3122,14 @@ font-size: var(--fs-sm);
 .flow-bracket-reps,
 .flow-bracket-new-tag {
   position: relative;
-  top: 12px; /* sit on the U-bracket bottom rail (taller arms) */
+  top: 8px; /* sit on the U-bracket bottom rail */
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  height: 20px;
+  height: 18px;
   line-height: 1;
-  padding: 0 8px;
+  padding: 0 6px;
   white-space: nowrap;
   vertical-align: middle;
 }

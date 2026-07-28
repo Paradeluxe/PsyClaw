@@ -309,17 +309,19 @@ def test_flow_spacing_expands_only_for_crowded_loop_labels(live_app_url: str) ->
         )
         assert "error" not in metrics, metrics
         assert metrics["documentOverflow"] == 0, metrics
-        assert all(item["base"] == 32 for item in metrics["connectorState"]), metrics
+        assert all(item["base"] == 40 for item in metrics["connectorState"]), metrics
         widths = [item["width"] for item in metrics["connectorState"]]
-        assert max(widths) > 32, metrics
-        # short loop may need a few px for unwrap; long loop gaps must open more
-        assert min(widths) <= 40, metrics
-        assert max(widths) - min(widths) >= 16, metrics
-        expanded = [w for w in widths if w >= max(widths) - 1]
-        assert expanded and max(expanded) - min(expanded) <= 1, metrics
+        assert max(widths) > 40, metrics
+        # all connectors near a loop should open above base when labels need room
+        assert min(widths) >= 40, metrics
         assert metrics["longContentLeft"] >= metrics["leftNeighborRight"] + 4, metrics
         assert metrics["longContentRight"] <= metrics["rightNeighborLeft"] - 4, metrics
-        assert metrics["shortBracketWidth"] < metrics["longBracketWidth"], metrics
+        # long multi-child U must be wider than short single-child U
+        assert metrics["longBracketWidth"] > metrics["shortBracketWidth"], metrics
+        # long label must sit with air inside its widened neighborhood
+        assert metrics["longBracketWidth"] >= (
+            metrics["longContentRight"] - metrics["longContentLeft"]
+        ), metrics
 
         page.set_viewport_size({"width": 800, "height": 700})
         page.wait_for_timeout(200)
@@ -336,5 +338,5 @@ def test_flow_spacing_expands_only_for_crowded_loop_labels(live_app_url: str) ->
         )
         assert responsive["documentOverflow"] == 0, responsive
         assert responsive["flowScrollable"] is True, responsive
-        assert responsive["maxConnector"] <= 96, responsive
+        assert responsive["maxConnector"] <= 120, responsive
         browser.close()

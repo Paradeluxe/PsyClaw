@@ -3014,7 +3014,9 @@ function t(key, vars) {
                   // how far into the gap from the covered pill edge (px + fraction)
                   function armFromInner(innerEdge, outerEdge, towardPrev) {
                     var gap = Math.abs(outerEdge - innerEdge);
-                    var inset = Math.max(4, Math.min(10, gap * 0.28));
+                    // Grow into widened adaptive gaps so U can host the label.
+                    // Cap below full midpoint (user: 太远) but allow far more than 10px.
+                    var inset = Math.max(6, Math.min(Math.round(gap * 0.4), gap - 6, 36));
                     return towardPrev ? (innerEdge - inset) : (innerEdge + inset);
                   }
                   var leftPx;
@@ -3048,9 +3050,10 @@ function t(key, vars) {
                   return { left: leftPx, right: rightPx };
                 }
 
-        var FLOW_CONNECTOR_BASE = 32;
-        var FLOW_CONNECTOR_MAX = 96;
-        var FLOW_LABEL_CLEARANCE = 8;
+        // Base air between routines; grow only when a loop label needs more width.
+        var FLOW_CONNECTOR_BASE = 40;
+        var FLOW_CONNECTOR_MAX = 120;
+        var FLOW_LABEL_CLEARANCE = 16; // each side around painted label cluster
 
         function connectorByGap(gapIndex) {
           return pillsRow.querySelector('.flow-connector[data-gap="' + gapIndex + '"]');
@@ -3091,12 +3094,22 @@ function t(key, vars) {
             left = Math.min(left, ur.left);
             right = Math.max(right, ur.right);
           }
-          // real painted content span + small air; no double-count pad/gap
+          // painted label cluster + breathing room on both sides
           return Math.ceil(right - left + FLOW_LABEL_CLEARANCE * 2);
+        }
+
+        /** Outer edge-to-edge of covered routine pills only (no U-arm inset). */
+        function coveredPillSpan(leafStart, leafEnd) {
+          var n0 = pillByLeaf(leafStart);
+          var n1 = pillByLeaf(leafEnd);
+          if (!n0 || !n1) return 0;
+          return Math.max(0, n1.getBoundingClientRect().right - n0.getBoundingClientRect().left);
         }
 
         function connectorGapIndexesForLoop(info) {
           var indexes = [];
+          // Prefer side gaps so a single-child loop can push neighbors apart
+          // and widen the U-arms; internal gaps also share when multi-child.
           if (info.leafStart > 0) indexes.push(info.leafStart - 1);
           for (var gi = info.leafStart; gi < info.leafEnd; gi++) indexes.push(gi);
           if (info.leafEnd < leaves.length - 1) indexes.push(info.leafEnd);
@@ -3106,25 +3119,31 @@ function t(key, vars) {
         function adaptRoutineSpacing() {
           resetConnectorWidths();
           if (!brackets.length || !leaves.length) return;
-          var tr = track.getBoundingClientRect();
+          // flush flex layout after reset so pill spans are base-gap accurate
+          void pillsRow.offsetWidth;
+
+          // gapIndex -> max extra px required by any loop touching that gap
+          var gapExtra = {};
           brackets.forEach(function (info) {
             var selector = '.flow-bracket[data-flow-path="' + info.path.join(',') + '"]';
             var bracket = bracketsLayer.querySelector(selector);
             if (!bracket) return;
-            var ends = bracketArmEnds(info.leafStart, info.leafEnd, tr);
-            if (!ends) return;
-            var available = Math.max(0, ends.right - ends.left);
+            // Compare label need to covered pill span — NOT arm-extended U width.
+            // Arm-extended span already eats into neighbor gaps and under-reports crush.
+            var available = coveredPillSpan(info.leafStart, info.leafEnd);
             var needed = measureBracketContentWidth(bracket);
             var extra = Math.max(0, needed - available);
             var gaps = connectorGapIndexesForLoop(info);
             if (!extra || !gaps.length) return;
             var addPerGap = Math.ceil(extra / gaps.length);
             gaps.forEach(function (gapIndex) {
-              var connector = connectorByGap(gapIndex);
-              if (!connector) return;
-              var current = connector.getBoundingClientRect().width || FLOW_CONNECTOR_BASE;
-              setConnectorWidth(connector, current + addPerGap);
+              gapExtra[gapIndex] = Math.max(gapExtra[gapIndex] || 0, addPerGap);
             });
+          });
+
+          Object.keys(gapExtra).forEach(function (key) {
+            var gapIndex = Number(key);
+            setConnectorWidth(connectorByGap(gapIndex), FLOW_CONNECTOR_BASE + gapExtra[gapIndex]);
           });
         }
 

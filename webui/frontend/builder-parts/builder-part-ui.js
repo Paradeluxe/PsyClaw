@@ -1397,7 +1397,7 @@
                     var md = walked.maxDepth;
                     var tr = track.getBoundingClientRect();
                     var rowR = pillsRow.getBoundingClientRect();
-                    var baseTop = Math.max(36, Math.round(rowR.bottom - tr.top + 6));
+                    var baseTop = Math.max(36, Math.round(rowR.bottom - tr.top + 2));
                     var levelH = 22; // room under arc for name + ×N
 
                     walked.brackets.forEach(function (brInfo) {
@@ -1691,7 +1691,7 @@
           var tr = track.getBoundingClientRect();
           var rowR = pillsRow.getBoundingClientRect();
           // anchor under the real pill row (not a magic 44px)
-          var baseTop = Math.max(36, Math.round(rowR.bottom - tr.top + 6));
+          var baseTop = Math.max(36, Math.round(rowR.bottom - tr.top + 2));
           var levelH = 22; // room under arc for name + ×N
 
           brackets.forEach(function (b) {

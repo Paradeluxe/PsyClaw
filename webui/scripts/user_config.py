@@ -71,6 +71,26 @@ def remember_webui_root(root: str | Path) -> Path:
     return out
 
 
+def remember_psychopy_python(path: str | Path) -> Path:
+    """Persist a verified PsychoPy interpreter path so survives restarts."""
+    abs_path = str(Path(path).expanduser().resolve())
+    data = load()
+    data["psychopy_python"] = abs_path
+    out = save(data)
+    return out
+
+
+def saved_psychopy_python() -> Optional[str]:
+    """Return the persisted PsychoPy interpreter path, or None."""
+    data = load()
+    p = data.get("psychopy_python")
+    if not p:
+        return None
+    if Path(p).is_file():
+        return str(p)
+    return None
+
+
 def resolve_webui_root(*, remember_if_found: bool = False) -> Optional[str]:
     """Return existing webui directory or None."""
     candidates = []

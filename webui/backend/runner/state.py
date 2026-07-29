@@ -112,6 +112,8 @@ class StateMachine:
         sm._lock = threading.Lock()
         sm.headless = data.get("headless")
         sm.design = data.get("design") if isinstance(data.get("design"), dict) else None
+        sm.runner = str(data.get("runner") or "unknown")
+        sm.engine = data.get("engine") if isinstance(data.get("engine"), dict) else {}
         return sm
 
     # --- accessors --------------------------------------------------------
@@ -224,6 +226,8 @@ class StateMachine:
             "spec": self.spec,
             "headless": getattr(self, "headless", None),
             "design": getattr(self, "design", None),
+            "runner": getattr(self, "runner", "unknown"),
+            "engine": getattr(self, "engine", {}),
         }
         tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:

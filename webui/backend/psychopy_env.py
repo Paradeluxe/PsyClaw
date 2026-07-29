@@ -34,7 +34,23 @@ _POSIX_STANDALONE = [
 
 
 def _env_override() -> str:
-    return (os.environ.get("PSYCLAW_PSYCHOPY_PYTHON") or "").strip()
+    env_val = (os.environ.get("PSYCLAW_PSYCHOPY_PYTHON") or "").strip()
+    if env_val:
+        return env_val
+    # Fall back to persisted user config (~/.psyclaw/config.json).
+    try:
+        import json as _json
+        home = os.path.expanduser("~")
+        cfg_path = os.path.join(home, ".psyclaw", "config.json")
+        if os.path.isfile(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as fh:
+                data = _json.load(fh)
+            p = str(data.get("psychopy_python") or "").strip()
+            if p and os.path.isfile(p):
+                return p
+    except Exception:
+        pass
+    return ""
 
 
 def _norm(p: str) -> str:
@@ -164,6 +180,14 @@ def _can_import_psychopy(python_exe: str, timeout: float = 12.0) -> bool:
 
 _RESOLVE_CACHE = {"path": None, "source": None}
 
+
+def clear_resolution_cache() -> None:
+    """Clear process-local probe results after a configured interpreter changes."""
+    _IMPORT_OK_CACHE.clear()
+    _RESOLVE_CACHE["path"] = None
+    _RESOLVE_CACHE["source"] = None
+
+
 def resolve_psychopy_python(
     *,
     verify_import: bool = False,
@@ -223,24 +247,47 @@ def psychopy_python() -> str:
 
 
 def psychopy_available() -> bool:
-    path, source = resolve_psychopy_python(verify_import=False)
-    if source == "fallback" and not os.path.isfile(path):
-        return False
-    if source == "library":
-        return True
-    if source == "env":
-        return os.path.isfile(path)
-    if source == "standalone":
-        return os.path.isfile(path)
-    return os.path.isfile(path)
+    return bool(resolve_psychopy_engine()["available"])
+
+
+def resolve_psychopy_engine() -> Dict[str, Any]:
+    """Return the one verified engine decision shared by probe and run dispatch.
+
+    A Python executable alone is insufficient. A real run needs an interpreter
+    that imports PsychoPy in the same clean environment used by the runner.
+    """
+    env = _env_override()
+    if env:
+        if not os.path.isfile(env):
+            return {"available": False, "path": env, "source": "env", "reason": "missing"}
+        if not _can_import_psychopy(env):
+            return {
+                "available": False,
+                "path": env,
+                "source": "env",
+                "reason": "import_failed",
+            }
+        _RESOLVE_CACHE["path"], _RESOLVE_CACHE["source"] = env, "env"
+        return {"available": True, "path": env, "source": "env", "reason": "ok"}
+
+    path, source = resolve_psychopy_python(verify_import=True)
+    if not os.path.isfile(path):
+        return {"available": False, "path": path, "source": source, "reason": "missing"}
+    if not _can_import_psychopy(path):
+        return {"available": False, "path": path, "source": source, "reason": "import_failed"}
+    return {"available": True, "path": path, "source": source, "reason": "ok"}
 
 
 def describe_resolution() -> Dict[str, Any]:
-    path, source = resolve_psychopy_python(verify_import=False)
+    engine = resolve_psychopy_engine()
+    path = str(engine["path"])
+    source = str(engine["source"])
     return {
         "path": path,
         "source": source,
         "exists": os.path.isfile(path),
+        "available": bool(engine["available"]),
+        "reason": engine["reason"],
         "priority": [
             "PSYCLAW_PSYCHOPY_PYTHON",
             "library (PATH python that imports psychopy)",

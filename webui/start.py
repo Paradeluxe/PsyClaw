@@ -302,6 +302,32 @@ def _remember_this_install(root: str) -> None:
         pass
 
 
+def _saved_psychopy_python() -> str:
+    """Return the persisted PsychoPy interpreter path, or ''."""
+    try:
+        scripts = os.path.join(_repo_root(), "scripts")
+        if scripts not in sys.path:
+            sys.path.insert(0, scripts)
+        from user_config import saved_psychopy_python  # type: ignore
+
+        return saved_psychopy_python() or ""
+    except Exception:
+        return ""
+
+
+def _child_env(root: str, port: int) -> dict:
+    """Build the env for the Flask subprocess, propagating PsychoPy path."""
+    env = os.environ.copy()
+    env.setdefault("PSYCLAW_PORT", str(port))
+    env["PYTHONPATH"] = os.path.join(root, "backend") + os.pathsep + env.get("PYTHONPATH", "")
+    # Session env override always wins; fall back to persisted config.
+    if not (env.get("PSYCLAW_PSYCHOPY_PYTHON") or "").strip():
+        saved = _saved_psychopy_python()
+        if saved:
+            env["PSYCLAW_PSYCHOPY_PYTHON"] = saved
+    return env
+
+
 def _pause_if_windows_error(code: int) -> None:
     if code == 0 or sys.platform != "win32":
         return
@@ -389,11 +415,12 @@ def main() -> int:
 
     print(f"psyclaw-webui → {url}")
     print(f"python: {py} ({py_src})")
+    psychopy_py = (os.environ.get("PSYCLAW_PSYCHOPY_PYTHON") or "").strip() or _saved_psychopy_python()
+    if psychopy_py:
+        print(f"psychopy: {psychopy_py}")
     print("Stop: Ctrl+C  |  close this window to stop the server")
 
-    env = os.environ.copy()
-    env.setdefault("PSYCLAW_PORT", str(port))
-    env["PYTHONPATH"] = os.path.join(root, "backend") + os.pathsep + env.get("PYTHONPATH", "")
+    env = _child_env(root, port)
 
     try:
         proc = subprocess.Popen(

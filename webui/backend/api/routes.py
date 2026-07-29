@@ -49,6 +49,12 @@ from paradigms import (
 )
 from runner import MockProcess, PsychoPyProcess, StateMachine
 import participants_registry as _preg
+try:
+    from psychopy_env import resolve_psychopy_engine
+    from psychopy_env import clear_resolution_cache
+except ImportError:
+    from backend.psychopy_env import resolve_psychopy_engine  # type: ignore
+    from backend.psychopy_env import clear_resolution_cache  # type: ignore
 
 
 # Repo root: backend/api/routes.py -> backend/api/ -> backend/ -> <repo root>
@@ -163,8 +169,8 @@ def _read_end_status(run_dir: str) -> str:
 def _run_lifecycle(sm: StateMachine, spec: Dict[str, Any]) -> None:
     """Background thread: created -> compiling -> compiled -> running -> finished.
 
-    Prefer real PsychoPyProcess when a PsychoPy Python is resolved on disk;
-    fall back to MockProcess so the UI still works offline.
+    The runner is captured by ``create_run`` before a run directory exists.
+    Mock is test-only and never an implicit fallback.
 
     ``sm.headless`` (default True): auto-keys, no blocking wait.
     headless=False: real PsychoPy window for a participant on this machine.
@@ -174,14 +180,9 @@ def _run_lifecycle(sm: StateMachine, spec: Dict[str, Any]) -> None:
         time.sleep(0.2)
         sm.transition_to("compiling", note="compiling spec into Python script")
 
-        try:
-            from psychopy_env import psychopy_available
-        except ImportError:
-            from backend.psychopy_env import psychopy_available  # type: ignore
-        use_real = psychopy_available()
-        force_mock = os.environ.get("PSYCLAW_FORCE_MOCK", "0") == "1"
+        runner = str(getattr(sm, "runner", "unavailable"))
 
-        if use_real and not force_mock:
+        if runner == "psychopy-real":
             time.sleep(0.1)
             sm.transition_to("compiled", note="script will be compiled by PsychoPyProcess")
             time.sleep(0.1)
@@ -253,7 +254,7 @@ def _run_lifecycle(sm: StateMachine, spec: Dict[str, Any]) -> None:
             else:
                 sm.fail(reason=f"PsychoPy exit code {process.returncode}")
                 _register_participant_if_any(sm, spec, end_status="unexpected")
-        else:
+        elif runner == "mock":
             time.sleep(0.5)
             sm.transition_to("compiled", note="script compiled (mock — no PsychoPy binary)")
             time.sleep(0.2)
@@ -321,6 +322,8 @@ def _run_lifecycle(sm: StateMachine, spec: Dict[str, Any]) -> None:
             else:
                 sm.fail(reason=f"process exited with code {process.returncode}")
                 _register_participant_if_any(sm, spec, end_status="unexpected")
+        else:
+            sm.fail(reason="run has no verified PsychoPy engine")
     except Exception as exc:  # noqa: BLE001
         try:
             sm.fail(reason=f"lifecycle crashed: {exc!r}")
@@ -495,6 +498,27 @@ def system_check() -> Response:
         return jsonify(report)
     except Exception as exc:  # noqa: BLE001
         return jsonify({"ok": False, "overall": "fail", "error": repr(exc), "checks": []}), 500
+
+
+@api_bp.route("/system/psychopy-path", methods=["POST"])
+def system_remember_psychopy() -> Response:
+    """Persist a verified PsychoPy interpreter to ~/.psyclaw/config.json."""
+    body = request.get_json(silent=True) or {}
+    py_path = str(body.get("path") or "").strip()
+    if not py_path:
+        return jsonify({"error": "path required"}), 400
+    if not os.path.isfile(py_path):
+        return jsonify({"error": f"not a file: {py_path}"}), 400
+    try:
+        scripts = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "scripts")
+        if scripts not in sys.path:
+            sys.path.insert(0, scripts)
+        from user_config import remember_psychopy_python  # type: ignore
+        cfg = remember_psychopy_python(py_path)
+        clear_resolution_cache()
+        return jsonify({"ok": True, "path": py_path, "config": str(cfg)})
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": repr(exc)}), 500
 
 
 @api_bp.route("/system/disk", methods=["GET"])
@@ -1080,6 +1104,22 @@ def create_run() -> Response:
         if spec_errors:
             return jsonify({"error": "spec validation failed", "errors": spec_errors}), 400
 
+    # Engine is a server-side safety gate, not a frontend-only System hint.
+    # Explicit PSYCLAW_FORCE_MOCK remains available for isolated test processes.
+    force_mock = os.environ.get("PSYCLAW_FORCE_MOCK", "0") == "1"
+    engine = (
+        {"available": True, "path": None, "source": "forced", "reason": "mock"}
+        if force_mock
+        else resolve_psychopy_engine()
+    )
+    if not force_mock and not engine["available"]:
+        return jsonify({
+            "error": "PsychoPy engine unavailable; recheck System or configure PSYCLAW_PSYCHOPY_PYTHON",
+            "code": "psychopy_engine_unavailable",
+            "runner": "unavailable",
+            "engine": engine,
+        }), 503
+
     # date + short hash — unique, sortable by day
     run_id = time.strftime("%Y%m%d") + "_" + uuid.uuid4().hex[:8]
     run_dir = _make_run_dir(run_id)
@@ -1090,6 +1130,8 @@ def create_run() -> Response:
     sm = StateMachine(run_id=run_id, run_dir=run_dir, paradigm_id=paradigm_id, spec=spec)
     sm.headless = headless  # type: ignore[attr-defined]
     sm.design = design  # type: ignore[attr-defined]
+    sm.runner = "mock" if force_mock else "psychopy-real"  # type: ignore[attr-defined]
+    sm.engine = engine  # type: ignore[attr-defined]
     with _RUNS_LOCK:
         _RUNS[run_id] = sm
 
@@ -1103,6 +1145,8 @@ def create_run() -> Response:
         "status": sm.state,
         "headless": headless,
         "source": "design" if design else "paradigm",
+        "runner": sm.runner,
+        "engine": sm.engine,
     })
 
 
@@ -1152,6 +1196,8 @@ def get_run(run_id: str) -> Response:
             "log_tail": sm.log_tail(50),
             "data_files": sm.list_data_files(),
             "instrument": _read_instrument(sm.run_dir),
+            "runner": getattr(sm, "runner", "unknown"),
+            "engine": getattr(sm, "engine", {}),
             "spec": {
                 "mode": (sm.spec or {}).get("mode"),
                 "participant_id": (sm.spec or {}).get("participant_id"),

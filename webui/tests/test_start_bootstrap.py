@@ -37,3 +37,23 @@ def test_ensure_runtime_reports_none_without_host_python(monkeypatch, tmp_path: 
     py, src = launcher._ensure_runtime(str(tmp_path))
     assert py is None
     assert src == "none"
+
+
+def test_child_env_prefers_inherited_psychopy_path(monkeypatch) -> None:
+    launcher = _load_start()
+    monkeypatch.setenv("PSYCLAW_PSYCHOPY_PYTHON", r"D:\session\python.exe")
+    monkeypatch.setattr(launcher, "_saved_psychopy_python", lambda: r"D:\saved\python.exe")
+
+    env = launcher._child_env(r"E:\webui", 8876)
+
+    assert env["PSYCLAW_PSYCHOPY_PYTHON"] == r"D:\session\python.exe"
+
+
+def test_child_env_uses_saved_psychopy_path_when_not_overridden(monkeypatch) -> None:
+    launcher = _load_start()
+    monkeypatch.delenv("PSYCLAW_PSYCHOPY_PYTHON", raising=False)
+    monkeypatch.setattr(launcher, "_saved_psychopy_python", lambda: r"D:\saved\python.exe")
+
+    env = launcher._child_env(r"E:\webui", 8876)
+
+    assert env["PSYCLAW_PSYCHOPY_PYTHON"] == r"D:\saved\python.exe"

@@ -89,10 +89,12 @@ def test_mock_run_finishes_downloads_and_mirrors_csv(api_client) -> None:
         },
     )
     assert created.status_code == 200
+    assert created.get_json()["runner"] == "mock"
     run_id = created.get_json()["run_id"]
 
     finished = _wait_for_status(client, run_id, {"finished", "failed", "stopped"})
     assert finished["status"] == "finished"
+    assert finished["runner"] == "mock"
     assert "trials.csv" in finished["data_files"]
 
     downloaded = client.get(f"/api/runs/{run_id}/data/trials.csv")
@@ -113,6 +115,35 @@ def test_mock_run_finishes_downloads_and_mirrors_csv(api_client) -> None:
     zf = zipfile.ZipFile(io.BytesIO(pack.data))
     names = zf.namelist()
     assert any(n.endswith(".csv") for n in names)
+
+
+def test_run_rejects_unavailable_psychopy_without_creating_artifacts(
+    api_client, monkeypatch
+) -> None:
+    client, tmp_path = api_client
+    monkeypatch.delenv("PSYCLAW_FORCE_MOCK", raising=False)
+    monkeypatch.setattr(
+        routes,
+        "resolve_psychopy_engine",
+        lambda: {
+            "available": False,
+            "path": r"D:\\missing\\python.exe",
+            "source": "env",
+            "reason": "missing",
+        },
+        raising=False,
+    )
+
+    response = client.post(
+        "/api/runs",
+        json={"design": _design("no-engine"), "headless": True},
+    )
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["code"] == "psychopy_engine_unavailable"
+    assert payload["runner"] == "unavailable"
+    assert not (tmp_path / "runs").exists()
 
 
 def test_stop_run_reaches_stopped_without_csv(api_client) -> None:

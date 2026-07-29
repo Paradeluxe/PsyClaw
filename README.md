@@ -54,9 +54,19 @@ cd ~/psyclaw/webui
 # First start.py / start.bat bootstraps .venv + pip if missing
 python start.py
 # → http://127.0.0.1:8876
-# Optional desktop shortcut:
+
+# 4. App shortcuts are created automatically by the one-shot installer.
+#    To re-create manually:
 # python scripts/make_desktop_shortcut.py
 ```
+
+### Where to find PsyClaw after install
+
+| OS | Look for | Search term |
+|----|----------|-------------|
+| **Windows** | Desktop icon · Start Menu | PsyClaw |
+| **macOS** | Launchpad · Spotlight | PsyClaw |
+| **Linux** | App menu (GNOME/KDE) | PsyClaw |
 ## User usage pipeline
 
 ```text

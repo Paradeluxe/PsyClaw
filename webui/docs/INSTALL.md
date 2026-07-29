@@ -135,26 +135,37 @@ WebUI is a **standalone lab app** (no agent skill required).
 
 **First launch:** if `.venv` is missing, `start.py` creates it and runs `pip install -r requirements.txt` (needs network once). `start.bat` will use system `python` / `py -3` only to bootstrap, then prefer `.venv`.
 
-**Windows:** double-click `start.bat`.  
-**macOS/Linux:** `start.command` / `start.sh` → `python3 start.py`.  
-Starts server, waits until `/api/health` is up, opens **http://127.0.0.1:8876/**.  
+**Windows:** double-click `start.bat`.
+**macOS/Linux:** `start.command` / `start.sh` → `python3 start.py`.
+Starts server, waits until `/api/health` is up, opens **http://127.0.0.1:8876/**.
 `--no-browser` skips the browser. Stop with Ctrl+C. On error, Windows console **pauses**.
 
-Desktop shortcut (icon = `icon.ico` / `icon.png` at webui root):
+### App shortcuts (created automatically)
+
+The one-shot installer (`install-all.bat` / `install-full.sh`) and
+`make_desktop_shortcut.py` register platform-appropriate app entries so you
+never need to find `start.bat` / `start.command` manually.
+
+| OS | What is created | Where to find it |
+|----|-----------------|-------------------|
+| **Windows** | Desktop `.lnk` + Start Menu `.lnk` | Desktop icon **PsyClaw WebUI** · Start Menu search **PsyClaw** |
+| **macOS** | `~/Applications/PsyClaw.app` bundle | **Launchpad** · **Spotlight** (search: PsyClaw) |
+| **Linux** | `~/.local/share/applications/PsyClaw.desktop` | App menu (GNOME/KDE) search **PsyClaw** |
+
+To re-create manually (e.g. after moving the folder):
 
 ```bash
 cd webui
 python scripts/make_desktop_shortcut.py
 ```
 
-One-shot install also creates the shortcut at the end.
-
 ### No git on the lab PC?
 
 1. On a machine with browser: GitHub **Paradeluxe/psyclaw** → **Code → Download ZIP** (or a maintainer-built zip from `python webui/scripts/build_dist_zip.py`).
 2. Unzip to `%USERPROFILE%\psyclaw` (so you have `psyclaw\webui\start.bat`).
 3. Double-click `webui\start.bat` (Python 3.10+ on PATH required).
-4. Optional: `python scripts/make_desktop_shortcut.py` after first successful start.
+4. Double-click `webui\start.bat` (Python 3.10+ on PATH required). First launch bootstraps `.venv` automatically.
+5. App shortcuts (Desktop + Start Menu) are created on first successful start. Or run `python scripts/make_desktop_shortcut.py` to re-create.
 
 Equivalent manual start:
 

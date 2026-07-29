@@ -34,3 +34,19 @@ def test_shortcut_source_uses_root_icon_helper() -> None:
     src = (ROOT / "scripts" / "make_desktop_shortcut.py").read_text(encoding="utf-8")
     assert "def icon_ico" in src
     assert 'os.path.join(root, "assets", "icon.ico")' not in src or "icon_ico" in src
+
+
+def test_windows_start_menu_dir_uses_appdata(monkeypatch, tmp_path: Path) -> None:
+    mod = _load_shortcut_mod()
+    appdata = tmp_path / "Roaming"
+    monkeypatch.setenv("APPDATA", str(appdata))
+    expected = appdata / "Microsoft" / "Windows" / "Start Menu" / "Programs"
+    assert Path(mod.windows_start_menu_dir()) == expected
+
+
+def test_windows_shortcut_paths_include_start_menu_entry(monkeypatch, tmp_path: Path) -> None:
+    mod = _load_shortcut_mod()
+    appdata = tmp_path / "Roaming"
+    monkeypatch.setenv("APPDATA", str(appdata))
+    _, start_menu_lnk = mod.windows_shortcut_paths(str(ROOT))
+    assert Path(start_menu_lnk) == appdata / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "PsyClaw.lnk"

@@ -123,7 +123,18 @@ pip install -r requirements.txt
 # 4. 启动 webui
 python start.py
 # → http://127.0.0.1:8876
+
+# 5. 应用入口由一键安装器自动创建。手动重建：
+# python scripts/make_desktop_shortcut.py
 ```
+
+### 装完之后去哪打开
+
+| 系统 | 入口 | 搜索 |
+|------|------|------|
+| **Windows** | 桌面图标 · 开始菜单 | PsyClaw |
+| **macOS** | Launchpad · Spotlight | PsyClaw |
+| **Linux** | 应用菜单（GNOME/KDE） | PsyClaw |
 
 ## 安装说明（不是使用管线）
 

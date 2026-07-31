@@ -425,3 +425,131 @@ def test_start_never_open_ended(live_app_url: str) -> None:
     assert any(x.startswith("0–") or x.startswith("0.2–") for x in metrics["labels"]), metrics
     assert any("∞" in x for x in metrics["labels"]), metrics
     assert not any(x.startswith("∞") for x in metrics["labels"]), metrics
+
+
+def test_run_bench_disclosure_copy_and_responsive_layout(live_app_url: str) -> None:
+    playwright = pytest.importorskip("playwright.sync_api")
+    executable = _browser_executable()
+    if not executable:
+        pytest.skip("Chrome/Edge executable not available")
+
+    project = ROOT / "tests" / "example_experiment"
+    sample_instr = {
+        "ok": True,
+        "mode": "autopilot",
+        "n_rows": 6,
+        "fps_hz": 60.0,
+        "display": {"size": [1920, 1080], "fullscreen": False},
+        "csv_project": str(project / "data" / "P_autopilot_s1_demo.csv"),
+        "csv": str(project / "data" / "P_autopilot_s1_demo.csv"),
+        "session": {"participant_id": "P_autopilot", "session": "1"},
+        "metrics": {
+            "overall": {
+                "accuracy": 1.0,
+                "mean_rt": 0.45,
+                "n_scored": 6,
+                "n_correct": 6,
+            }
+        },
+        "run_id": "20260731_benchdemo",
+        "at": "2026-07-31T12:00:00",
+    }
+
+    with playwright.sync_playwright() as runner:
+        browser = runner.chromium.launch(headless=True, executable_path=executable)
+        for viewport in (
+            {"width": 1440, "height": 900},
+            {"width": 1100, "height": 800},
+            {"width": 751, "height": 831},
+        ):
+            context = browser.new_context(
+                viewport=viewport,
+                permissions=["clipboard-read", "clipboard-write"],
+            )
+            page = context.new_page()
+            page.goto(live_app_url, wait_until="networkidle", timeout=30_000)
+            page.evaluate("() => localStorage.setItem('psyclaw.lang', 'en')")
+            page.evaluate(
+                "([key, value]) => localStorage.setItem(key, JSON.stringify(value))",
+                [
+                    "psyclaw.recentProjects",
+                    [{"path": str(project), "name": "example_experiment"}],
+                ],
+            )
+            page.evaluate(
+                "([key, value]) => localStorage.setItem(key, JSON.stringify(value))",
+                [
+                    "psyclaw.lastInstrument",
+                    {
+                        "instrument": sample_instr,
+                        "meta": {
+                            "mode": "autopilot",
+                            "run_id": "20260731_benchdemo",
+                            "when": "2026/7/31 12:00:00",
+                        },
+                        "savedAt": 1,
+                    },
+                ],
+            )
+            page.reload(wait_until="networkidle", timeout=30_000)
+            page.wait_for_function(
+                "() => document.body.classList.contains('has-project')", timeout=15_000
+            )
+            page.locator('.tab-btn[data-tab="run"]').click()
+            page.wait_for_function(
+                "() => document.querySelectorAll('#bench-design-chips .bench-chip').length > 0",
+                timeout=15_000,
+            )
+            page.wait_for_function(
+                "() => !document.getElementById('pilot-instrument-list').hidden",
+                timeout=10_000,
+            )
+
+            toggle = page.locator("#bench-design-toggle")
+            assert toggle.get_attribute("aria-expanded") == "false"
+            assert page.locator("#bench-design-chips .bench-chip.is-pass:visible").count() == 0
+            if toggle.is_visible():
+                toggle.click()
+                assert toggle.get_attribute("aria-expanded") == "true"
+                assert page.locator("#bench-design-chips .bench-chip.is-pass:visible").count() > 0
+                toggle.click()
+                assert toggle.get_attribute("aria-expanded") == "false"
+
+            page.locator('[data-copy-target="instr-csv"]').click()
+            page.wait_for_timeout(100)
+            assert page.locator('[data-copy-target="instr-csv"]').evaluate(
+                "el => el.classList.contains('is-copied')"
+            )
+            assert page.locator("#instr-hit").inner_text().strip() == "n/a"
+            assert page.locator("#instr-fa").inner_text().strip() == "n/a"
+
+            metrics = page.evaluate(
+                """() => {
+                  const r = (s) => {
+                    const el = document.querySelector(s);
+                    if (!el) return null;
+                    const b = el.getBoundingClientRect();
+                    return {x:b.x,y:b.y,w:b.width,h:b.height,bottom:b.bottom};
+                  };
+                  return {
+                    core: r('#bench-core'),
+                    bench: r('#pilot-instrument-card'),
+                    log: r('.run-log-panel'),
+                    gridColumns: getComputedStyle(document.querySelector('.run-grid')).gridTemplateColumns,
+                    coreColumns: getComputedStyle(document.querySelector('#bench-core')).gridTemplateColumns,
+                    overflow: document.documentElement.scrollWidth - innerWidth,
+                  };
+                }"""
+            )
+            assert metrics["core"] is not None
+            assert metrics["bench"] is not None
+            assert metrics["log"] is not None
+            assert metrics["overflow"] <= 1
+            assert metrics["log"]["h"] >= 180
+            if viewport["width"] <= 1100:
+                assert metrics["log"]["y"] >= metrics["bench"]["bottom"] - 2
+            if viewport["width"] == 751:
+                # 2 columns at 760px breakpoint
+                assert len([c for c in metrics["coreColumns"].split() if c.strip()]) == 2
+            context.close()
+        browser.close()

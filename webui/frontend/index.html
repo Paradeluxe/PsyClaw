@@ -6,7 +6,7 @@
   <title>psyclaw-webui</title>
     <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" href="style.css?v=318">
+    <link rel="stylesheet" href="style.css?v=323">
     </head>
   <body class="no-project">
     <!-- Workspace gate: must open/create a folder before Builder/System/Run -->
@@ -380,8 +380,7 @@
                                         </button>
                   </div>
                   <p class="muted run-mode-hint" id="run-mode-hint" data-i18n="run.modeHint">Start uses a real participant ID · Pilot is manual and does not consume IDs · Autopilot simulates responses automatically. Session form replaces PsychoPy expInfo.</p>
-
-                        <div class="run-telemetry" id="run-telemetry" aria-label="Run telemetry">
+<div class="run-telemetry" id="run-telemetry" aria-label="Run telemetry">
                           <div class="run-telemetry-item">
                             <span class="run-telemetry-k" data-i18n="run.source">Source</span>
                             <span class="run-telemetry-v" id="run-paradigm">&mdash;</span>
@@ -512,40 +511,75 @@
                         </div>
 
                         <div class="run-grid">
-                          <section class="run-panel run-instrument-panel is-empty" aria-label="Last run instrument" id="pilot-instrument-card">
-                            <div class="panel-heading">
-                              <span class="eyebrow" data-i18n="run.bench">bench</span>
-                              <h3 data-i18n="run.instrument">Instrument</h3>
+                          <section class="run-panel run-instrument-panel is-empty" aria-label="Bench" id="pilot-instrument-card">
+                            <div class="bench-head">
+                              <div class="panel-heading">
+                                <span class="eyebrow" data-i18n="run.bench">bench</span>
+                                <h3 data-i18n="run.benchTitle">Bench</h3>
+                              </div>
+                              <span class="bench-overall is-idle" id="bench-overall" title="">—</span>
                             </div>
-                            <p class="run-instr-empty muted" id="instr-empty" data-i18n="run.instrEmpty">No completed run yet. Start, Pilot, or Autopilot results appear here.</p>
-                            <dl class="status-list" id="pilot-instrument-list" hidden>
-                                                          <div><dt data-i18n="run.instrStatus">Status</dt><dd id="instr-status">—</dd></div>
-                                                          <div><dt data-i18n="run.instrMode">Mode</dt><dd id="instr-mode">—</dd></div>
-                                                          <div><dt data-i18n="run.instrHeadless">Headless</dt><dd id="instr-headless">—</dd></div>
-                                                          <div><dt data-i18n="run.instrDesign">Design</dt><dd id="instr-design">—</dd></div>
-                                                          <div><dt data-i18n="run.instrPid">Participant</dt><dd id="instr-pid">—</dd></div>
-                                                          <div><dt data-i18n="run.instrPname">Name</dt><dd id="instr-pname">—</dd></div>
-                                                          <div><dt data-i18n="run.instrSess">Session</dt><dd id="instr-sess">—</dd></div>
-                                                          <div><dt data-i18n="run.instrDate">Timestamp</dt><dd id="instr-date">—</dd></div>
-                                                          <div><dt data-i18n="run.instrExp">Experimenter</dt><dd id="instr-exp">—</dd></div>
-                                                          <div><dt data-i18n="run.instrTrials">Trials</dt><dd id="instr-rows">—</dd></div>
-                                                          <div><dt data-i18n="run.instrAcc">Accuracy</dt><dd id="instr-acc">—</dd></div>
-                                                          <div><dt data-i18n="run.instrMeanRt">Mean RT</dt><dd id="instr-mean-rt">—</dd></div>
-                                                          <div data-instr-span="1"><dt data-i18n="run.instrHit">Hit rate</dt><dd id="instr-hit">—</dd></div>
-                                                          <div data-instr-span="1"><dt data-i18n="run.instrFa">FA rate</dt><dd id="instr-fa">—</dd></div>
-                                                          <div class="instr-span-2" data-instr-span="2"><dt data-i18n="run.instrFps">FPS</dt><dd id="instr-fps">—</dd></div>
-                                                          <div class="instr-span-2" data-instr-span="2"><dt data-i18n="run.instrDisplay">Display</dt><dd id="instr-display">—</dd></div>
-                                                          <div><dt data-i18n="run.instrKb">Keyboard</dt><dd id="instr-kb">—</dd></div>
-                                                          <div><dt data-i18n="run.instrMic">Microphone</dt><dd id="instr-mic">—</dd></div>
-                                                          <div><dt data-i18n="run.instrSound">Sound</dt><dd id="instr-sound">—</dd></div>
-                                                          <div class="instr-span-2" data-instr-span="2"><dt data-i18n="run.instrNeeds">Needs</dt><dd id="instr-needs">—</dd></div>
-                                                          <div class="instr-span-2" data-instr-span="2"><dt data-i18n="run.instrFolder">Folder</dt><dd id="instr-folder">—</dd></div>
-                                                          <div class="instr-span-2" data-instr-span="2"><dt data-i18n="run.instrCsv">CSV</dt><dd id="instr-csv">—</dd></div>
-                                                          <div data-instr-span="1"><dt data-i18n="run.instrWhen">When</dt><dd id="instr-when">—</dd></div>
-                                                          <div data-instr-span="1"><dt data-i18n="run.instrRun">Run</dt><dd id="instr-run">—</dd></div>
-                                                        </dl>
-                            <pre class="run-instrument-notes muted" id="instr-notes" hidden></pre>
-                          </section>
+
+                            <!-- A. Design readiness (pre-run) -->
+                                                        <div class="bench-section" id="bench-design">
+                                                          <div class="bench-section-head">
+                                                            <span class="bench-section-label" data-i18n="run.benchDesign">Design</span>
+                                                            <div class="bench-section-actions">
+                                                              <span class="bench-section-meta muted" id="bench-design-meta">—</span>
+                                                              <button type="button" class="bench-design-toggle" id="bench-design-toggle" aria-expanded="false" data-i18n="run.benchShowAll">Show all</button>
+                                                            </div>
+                                                          </div>
+                                                          <div class="bench-chips" id="bench-design-chips" aria-live="polite"></div>
+                                                          <p class="bench-design-note muted" id="bench-design-note" hidden></p>
+                                                        </div>
+
+                                                        <!-- B. Last completed run -->
+                                                        <div class="bench-section" id="bench-last">
+                                                          <div class="bench-section-head">
+                                                            <span class="bench-section-label" data-i18n="run.benchLast">Last run</span>
+                                                            <span class="bench-section-meta muted" id="bench-last-meta">—</span>
+                                                          </div>
+                                                          <p class="run-instr-empty muted" id="instr-empty" data-i18n="run.instrEmpty">No completed run yet. Start, Pilot, or Autopilot results appear here.</p>
+
+                                                          <div class="bench-last-content" id="pilot-instrument-list" hidden>
+                                                            <dl class="bench-core-grid" id="bench-core">
+                                                              <div class="bench-metric is-status"><dt data-i18n="run.instrStatus">Status</dt><dd id="instr-status">—</dd></div>
+                                                              <div class="bench-metric is-mode"><dt data-i18n="run.instrMode">Mode</dt><dd id="instr-mode">—</dd></div>
+                                                              <div class="bench-metric"><dt data-i18n="run.instrTrials">Trials</dt><dd id="instr-rows">—</dd></div>
+                                                              <div class="bench-metric"><dt data-i18n="run.instrAcc">Accuracy</dt><dd id="instr-acc">—</dd></div>
+                                                              <div class="bench-metric"><dt data-i18n="run.instrMeanRt">Mean RT</dt><dd id="instr-mean-rt">—</dd></div>
+                                                            </dl>
+
+                                                            <dl class="bench-details-grid" id="bench-details">
+                                                              <div><dt data-i18n="run.instrHit">Hit rate</dt><dd id="instr-hit">—</dd></div>
+                                                              <div><dt data-i18n="run.instrFa">FA rate</dt><dd id="instr-fa">—</dd></div>
+                                                              <div><dt data-i18n="run.instrFps">FPS</dt><dd id="instr-fps">—</dd></div>
+                                                              <div><dt data-i18n="run.instrDisplay">Display</dt><dd id="instr-display">—</dd></div>
+                                                              <div><dt data-i18n="run.instrPid">Participant</dt><dd id="instr-pid">—</dd></div>
+                                                              <div><dt data-i18n="run.instrSess">Session</dt><dd id="instr-sess">—</dd></div>
+                                                              <div><dt data-i18n="run.instrWhen">When</dt><dd id="instr-when">—</dd></div>
+                                                              <div><dt data-i18n="run.instrRun">Run</dt><dd id="instr-run">—</dd></div>
+                                                            </dl>
+
+                                                            <dl class="bench-files" id="bench-files">
+                                                              <div class="bench-file-row">
+                                                                <dt data-i18n="run.instrFolder">Folder</dt>
+                                                                <dd id="instr-folder">—</dd>
+                                                                <button type="button" class="bench-copy" data-copy-target="instr-folder" data-i18n-title="run.copyValue" title="Copy value" aria-label="Copy folder path">
+                                                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                                </button>
+                                                              </div>
+                                                              <div class="bench-file-row">
+                                                                <dt data-i18n="run.instrCsv">CSV</dt>
+                                                                <dd id="instr-csv">—</dd>
+                                                                <button type="button" class="bench-copy" data-copy-target="instr-csv" data-i18n-title="run.copyValue" title="Copy value" aria-label="Copy CSV path">
+                                                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                                </button>
+                                                              </div>
+                                                            </dl>
+                                                          </div>
+                                                        </div>
+                                                      </section>
 
                           <section class="run-panel run-log-panel" aria-label="Run log">
                             <div class="panel-heading">
@@ -792,10 +826,10 @@
     </footer>
 
     <!-- i18n → builder (parts assembled into builder.js) → app system/run → shell -->
-    <script src="i18n.js?v=277"></script>
-            <script src="builder.js?v=275"></script>
-            <script src="app-system.js?v=284"></script>
-        <script src="app-run.js?v=267"></script>
-        <script src="app.js?v=262"></script>
+    <script src="i18n.js?v=280"></script>
+                <script src="builder.js?v=277"></script>
+                <script src="app-system.js?v=284"></script>
+            <script src="app-run.js?v=271"></script>
+            <script src="app.js?v=262"></script>
   </body>
 </html>

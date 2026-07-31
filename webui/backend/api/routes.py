@@ -537,6 +537,33 @@ def system_disk() -> Response:
         return jsonify({"ok": False, "error": repr(exc)}), 500
 
 
+@api_bp.route("/design/preflight", methods=["POST"])
+def design_preflight() -> Response:
+    """Design-side Run preflight (practice, materials, structure).
+
+    Body: { design?: object, project_path?: str }
+    If design omitted, tries to load marker from project_path.
+    """
+    from pathlib import Path as _Path
+
+    from design_preflight import analyze_design
+    from designs_store import read_design
+
+    body = request.get_json(silent=True) or {}
+    design = body.get("design")
+    project_path = (body.get("project_path") or body.get("path") or "").strip() or None
+    if design is None and project_path:
+        data, err = read_design(_Path(project_path))
+        if err or not isinstance(data, dict):
+            return jsonify({"ok": False, "error": err or "no design", "code": "load_failed"}), 400
+        design = data
+    try:
+        result = analyze_design(design if isinstance(design, dict) else None, project_path)
+        return jsonify(result)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": str(exc), "code": "preflight_failed"}), 500
+
+
 @api_bp.route("/conditions/parse", methods=["POST"])
 def conditions_parse() -> Response:
     """Parse uploaded stimlist (csv/xlsx) → rows for loop.conditions.

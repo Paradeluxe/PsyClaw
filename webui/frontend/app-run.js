@@ -780,11 +780,16 @@
         var card = document.getElementById('pilot-instrument-card');
         var list = document.getElementById('pilot-instrument-list');
         var emptyEl = document.getElementById('instr-empty');
+        var lastMeta = document.getElementById('bench-last-meta');
+        // is-empty only means "no last run" — design block still visible
         if (card) card.classList.toggle('is-empty', !!isEmpty);
         if (list) list.hidden = !!isEmpty;
         if (emptyEl) {
           emptyEl.hidden = !isEmpty;
           if (isEmpty) emptyEl.textContent = t('run.instrEmpty');
+        }
+        if (lastMeta && isEmpty) {
+          lastMeta.textContent = (typeof t === 'function' ? t('run.benchLastNone') : '—');
         }
       }
 
@@ -814,7 +819,6 @@
         var csvEl = document.getElementById('instr-csv');
         var when = document.getElementById('instr-when');
         var runEl = document.getElementById('instr-run');
-        var notes = document.getElementById('instr-notes');
         if (!instr) {
           setInstrumentEmpty(true);
           if (st) {
@@ -824,6 +828,12 @@
           return;
         }
         setInstrumentEmpty(false);
+        var lastMetaEl = document.getElementById('bench-last-meta');
+        if (lastMetaEl) {
+          var m0 = formatRunMode(String(instr.mode || meta.mode || '').trim()) || '—';
+          var ok0 = instr.ok !== false;
+          lastMetaEl.textContent = (ok0 ? 'OK' : 'check') + ' · ' + m0;
+        }
         var sess = (instr.session && typeof instr.session === 'object')
           ? instr.session
           : ((meta.session && typeof meta.session === 'object') ? meta.session : {});
@@ -904,158 +914,110 @@
                 }
                 if (rowsEl) rowsEl.textContent = (instr.n_rows != null) ? String(instr.n_rows) : '—';
         (function fillMetrics() {
-          var m = instr.metrics && typeof instr.metrics === 'object' ? instr.metrics : null;
-          var ov = m && m.overall && typeof m.overall === 'object' ? m.overall : null;
-          function pct(v) {
-            if (v == null || v === '') return '—';
-            var n = Number(v);
-            if (!isFinite(n)) return String(v);
-            return (Math.round(n * 1000) / 10) + '%';
-          }
-          function sec(v) {
-            if (v == null || v === '') return '—';
-            var n = Number(v);
-            if (!isFinite(n)) return String(v);
-            return (Math.round(n * 1000) / 1000) + ' s';
-          }
-          if (accEl) {
-            accEl.textContent = ov ? pct(ov.accuracy) : '—';
-            if (ov && ov.n_scored != null) accEl.setAttribute('title', 'n_scored=' + ov.n_scored + ' n_correct=' + (ov.n_correct != null ? ov.n_correct : '?'));
-          }
-          if (meanRtEl) {
-            meanRtEl.textContent = ov ? sec(ov.mean_rt) : '—';
-            if (ov && ov.mean_rt_correct != null) meanRtEl.setAttribute('title', 'correct ' + sec(ov.mean_rt_correct));
-          }
-          if (hitEl) hitEl.textContent = ov && ov.hit_rate != null ? pct(ov.hit_rate) : '—';
-          if (faEl) faEl.textContent = ov && ov.fa_rate != null ? pct(ov.fa_rate) : '—';
-        })();
-        (function fillFolderAndCsv() {
-          function dirnameOf(p) {
-            var s = String(p || '').trim();
-            if (!s) return '';
-            var i = Math.max(s.lastIndexOf('\\'), s.lastIndexOf('/'));
-            return i >= 0 ? s.slice(0, i) : '';
-          }
-          function basenameOf(p) {
-            var s = String(p || '').trim();
-            if (!s) return '';
-            var i = Math.max(s.lastIndexOf('\\'), s.lastIndexOf('/'));
-            return i >= 0 ? s.slice(i + 1) : s;
-          }
-          var full = instr.csv_project || instr.csv || '';
-          var folder = dirnameOf(full);
-          var name = basenameOf(full);
-          if (folderEl) {
-            folderEl.textContent = folder || '—';
-            if (folder) folderEl.setAttribute('title', folder);
-            else folderEl.removeAttribute('title');
-          }
-          if (csvEl) {
-            csvEl.textContent = name || '—';
-            var tip = '';
-            if (instr.csv_project) tip = instr.csv_project;
-            if (instr.csv && instr.csv !== instr.csv_project) {
-              tip = tip ? (tip + ' (run: ' + instr.csv + ')') : String(instr.csv);
-            }
-            if (tip) csvEl.setAttribute('title', tip);
-            else csvEl.removeAttribute('title');
-          }
-        })();
-        if (when) when.textContent = meta.when || instr.at || new Date().toLocaleString();
-                if (runEl) runEl.textContent = meta.run_id || instr.run_id || '—';
-                // 2-col bench: short stay half; long / forced → full. Values always left (CSS).
-                (function clampInstrumentRows() {
-                  var list = document.getElementById('pilot-instrument-list');
-                  if (!list) return;
-                  var rows = Array.prototype.slice.call(list.querySelectorAll(':scope > div'));
-                  // half-cell is ~half panel; treat medium-long as full so right col isn't clipped junk
-                  var LONG = 28;
-                  rows.forEach(function (row) {
-                    var dd = row.querySelector('dd');
-                    if (!dd) return;
-                    var txt = String(dd.textContent || '').trim();
-                    if (txt && txt !== '—') dd.setAttribute('title', txt);
-                    else dd.removeAttribute('title');
-                    var force = row.getAttribute('data-instr-span');
-                    var id = dd.id || '';
-                    if (force === '1' || id === 'instr-when' || id === 'instr-run') {
-                      row.classList.remove('instr-span-2');
-                      return;
-                    }
-                    if (
-                      force === '2' ||
-                      id === 'instr-fps' ||
-                      id === 'instr-csv' ||
-                      id === 'instr-folder' ||
-                      id === 'instr-needs' ||
-                      id === 'instr-display'
-                    ) {
-                      row.classList.add('instr-span-2');
-                      return;
-                    }
-                    var longish = /[\\/]/.test(txt) || txt.length > LONG;
-                    if (longish) row.classList.add('instr-span-2');
-                    else row.classList.remove('instr-span-2');
-                  });
-                  // orphan half before a full-span → promote previous half to full (no empty hole)
-                  var singles = 0;
-                  rows.forEach(function (row) {
-                    if (row.classList.contains('instr-span-2')) {
-                      if (singles % 2 === 1) {
-                        var prevIdx = rows.indexOf(row) - 1;
-                        while (prevIdx >= 0 && rows[prevIdx].classList.contains('instr-span-2')) prevIdx--;
-                        if (prevIdx >= 0) {
-                          var prev = rows[prevIdx];
-                          var pForce = prev.getAttribute('data-instr-span');
-                          var pDd = prev.querySelector('dd');
-                          var pId = pDd ? (pDd.id || '') : '';
-                          if (pForce !== '1' && pId !== 'instr-when' && pId !== 'instr-run') {
-                            prev.classList.add('instr-span-2');
-                          }
-                        }
-                      }
-                      singles = 0;
+                  var m = instr.metrics && typeof instr.metrics === 'object' ? instr.metrics : null;
+                  var ov = m && m.overall && typeof m.overall === 'object' ? m.overall : null;
+                  var na = t('run.notApplicable');
+                  function setNa(el, isNa) {
+                    if (!el) return;
+                    el.classList.toggle('is-na', !!isNa);
+                  }
+                  function pct(v) {
+                    if (v == null || v === '') return null;
+                    var n = Number(v);
+                    if (!isFinite(n)) return String(v);
+                    return (Math.round(n * 1000) / 10) + '%';
+                  }
+                  function sec(v) {
+                    if (v == null || v === '') return null;
+                    var n = Number(v);
+                    if (!isFinite(n)) return String(v);
+                    return (Math.round(n * 1000) / 1000) + ' s';
+                  }
+                  if (accEl) {
+                    var accV = ov ? pct(ov.accuracy) : null;
+                    accEl.textContent = accV != null ? accV : na;
+                    setNa(accEl, accV == null);
+                    if (ov && ov.n_scored != null) accEl.setAttribute('title', 'n_scored=' + ov.n_scored + ' n_correct=' + (ov.n_correct != null ? ov.n_correct : '?'));
+                    else accEl.removeAttribute('title');
+                  }
+                  if (meanRtEl) {
+                    var rtV = ov ? sec(ov.mean_rt) : null;
+                    meanRtEl.textContent = rtV != null ? rtV : na;
+                    setNa(meanRtEl, rtV == null);
+                    if (ov && ov.mean_rt_correct != null) meanRtEl.setAttribute('title', 'correct ' + sec(ov.mean_rt_correct));
+                    else meanRtEl.removeAttribute('title');
+                  }
+                  if (hitEl) {
+                    var hitV = ov && ov.hit_rate != null ? pct(ov.hit_rate) : null;
+                    hitEl.textContent = hitV != null ? hitV : na;
+                    setNa(hitEl, hitV == null);
+                  }
+                  if (faEl) {
+                    var faV = ov && ov.fa_rate != null ? pct(ov.fa_rate) : null;
+                    faEl.textContent = faV != null ? faV : na;
+                    setNa(faEl, faV == null);
+                  }
+                })();
+                (function fillFolderAndCsv() {
+                  function dirnameOf(p) {
+                    var s = String(p || '').trim();
+                    if (!s) return '';
+                    var i = Math.max(s.lastIndexOf('\\'), s.lastIndexOf('/'));
+                    return i >= 0 ? s.slice(0, i) : '';
+                  }
+                  function basenameOf(p) {
+                    var s = String(p || '').trim();
+                    if (!s) return '';
+                    var i = Math.max(s.lastIndexOf('\\'), s.lastIndexOf('/'));
+                    return i >= 0 ? s.slice(i + 1) : s;
+                  }
+                  var full = instr.csv_project || instr.csv || '';
+                  var folder = dirnameOf(full);
+                  var name = basenameOf(full);
+                  var na = t('run.notApplicable');
+                  if (folderEl) {
+                    folderEl.textContent = folder || na;
+                    folderEl.classList.toggle('is-na', !folder);
+                    if (folder) {
+                      folderEl.setAttribute('title', folder);
+                      folderEl.setAttribute('data-copy-value', folder);
                     } else {
-                      singles += 1;
+                      folderEl.removeAttribute('title');
+                      folderEl.removeAttribute('data-copy-value');
                     }
-                  });
-                  // trailing odd half → full (except forced pair When|Run)
-                  if (singles % 2 === 1) {
-                    var last = null;
-                    for (var i = rows.length - 1; i >= 0; i--) {
-                      if (!rows[i].classList.contains('instr-span-2')) { last = rows[i]; break; }
+                  }
+                  if (csvEl) {
+                    csvEl.textContent = name || na;
+                    csvEl.classList.toggle('is-na', !name);
+                    var tip = '';
+                    if (instr.csv_project) tip = instr.csv_project;
+                    if (instr.csv && instr.csv !== instr.csv_project) {
+                      tip = tip ? (tip + ' (run: ' + instr.csv + ')') : String(instr.csv);
                     }
-                    if (last) {
-                      var lForce = last.getAttribute('data-instr-span');
-                      var lDd = last.querySelector('dd');
-                      var lId = lDd ? (lDd.id || '') : '';
-                      if (lForce !== '1' && lId !== 'instr-when' && lId !== 'instr-run') {
-                        last.classList.add('instr-span-2');
-                      }
+                    var copyVal = tip || full || '';
+                    if (copyVal) {
+                      csvEl.setAttribute('title', tip || copyVal);
+                      csvEl.setAttribute('data-copy-value', copyVal);
+                    } else {
+                      csvEl.removeAttribute('title');
+                      csvEl.removeAttribute('data-copy-value');
                     }
                   }
                 })();
-                if (notes) {
-          var lines = [];
-          if (sess.uid || meta.uid) lines.push('uid: ' + (sess.uid || meta.uid));
-          if (sess.notes) lines.push('notes: ' + sess.notes);
-          if (sess.custom && typeof sess.custom === 'object') {
-            Object.keys(sess.custom).forEach(function (k) {
-              lines.push(k + '=' + sess.custom[k]);
-            });
-          }
-          if (Array.isArray(instr.notes) && instr.notes.length) {
-                      instr.notes.forEach(function (n) { lines.push(String(n)); });
-                    }
-                    if (lines.length) {
-            notes.hidden = false;
-            notes.textContent = lines.join('\n');
-          } else {
-            notes.hidden = true;
-            notes.textContent = '';
-          }
-        }
-      }
+                if (when) when.textContent = meta.when || instr.at || new Date().toLocaleString();
+                        if (runEl) runEl.textContent = meta.run_id || instr.run_id || '—';
+                        // Titles on detail values for hover; layout handled by bench grids.
+                        (function annotateBenchTitles() {
+                          var root = document.getElementById('pilot-instrument-list');
+                          if (!root) return;
+                          root.querySelectorAll('dd').forEach(function (dd) {
+                            if (dd.id === 'instr-folder' || dd.id === 'instr-csv') return;
+                            var txt = String(dd.textContent || '').trim();
+                            if (txt && txt !== '—' && txt !== t('run.notApplicable')) dd.setAttribute('title', txt);
+                            else if (!dd.getAttribute('data-copy-value')) dd.removeAttribute('title');
+                          });
+                        })();
+              }
 
       function loadLastInstrument() {
         try {
@@ -1373,7 +1335,255 @@
               syncOpenFolderBtn();
             }
 
-            async function armRun(modeLabel) {
+
+            var lastDesignPreflight = null;
+                        var _designPfTimer = null;
+                        var benchDesignExpanded = false;
+
+                        function syncBenchDesignDisclosure() {
+                          var toggle = document.getElementById('bench-design-toggle');
+                          var chips = document.getElementById('bench-design-chips');
+                          if (!toggle || !chips) return;
+                          chips.querySelectorAll('.bench-chip.is-pass').forEach(function (chip) {
+                            chip.classList.toggle('is-hidden-pass', !benchDesignExpanded);
+                          });
+                          toggle.setAttribute('aria-expanded', benchDesignExpanded ? 'true' : 'false');
+                          toggle.textContent = t(benchDesignExpanded ? 'run.benchShowIssues' : 'run.benchShowAll');
+                          var hasPass = chips.querySelectorAll('.bench-chip.is-pass').length > 0;
+                          var hasProblem = chips.querySelectorAll('.bench-chip.is-warn, .bench-chip.is-fail').length > 0;
+                          toggle.hidden = !hasPass;
+                          if (!hasPass && !hasProblem && chips.childElementCount === 0) {
+                            toggle.hidden = true;
+                          }
+                        }
+
+                        function paintDesignPreflight(result) {
+                          var chips = document.getElementById('bench-design-chips');
+                          var metaEl = document.getElementById('bench-design-meta');
+                          var noteEl = document.getElementById('bench-design-note');
+                          var overallEl = document.getElementById('bench-overall');
+                          lastDesignPreflight = result || null;
+                          if (!chips) return;
+
+                          chips.innerHTML = '';
+                          if (noteEl) {
+                            noteEl.hidden = true;
+                            noteEl.textContent = '';
+                            noteEl.classList.remove('is-warn', 'is-fail');
+                          }
+
+                          if (!result || !Array.isArray(result.checks)) {
+                            if (metaEl) metaEl.textContent = (typeof t === 'function' ? t('run.designGateNone') : '—');
+                            if (overallEl) {
+                              overallEl.textContent = '—';
+                              overallEl.className = 'bench-overall is-idle';
+                              overallEl.removeAttribute('title');
+                            }
+                            syncBenchDesignDisclosure();
+                            return;
+                          }
+
+                          var counts = result.counts || {};
+                          var level = result.level || result.overall || 'run';
+                          if (metaEl) {
+                            try {
+                              metaEl.textContent = (typeof t === 'function'
+                                ? t('run.designGateOk', {
+                                    pass: counts.pass || 0,
+                                    warn: counts.warn || 0,
+                                    fail: counts.fail || 0,
+                                  })
+                                : ((counts.pass || 0) + ' ok · ' + (counts.warn || 0) + ' warn · ' + (counts.fail || 0) + ' fail'));
+                            } catch (eS) {
+                              metaEl.textContent = (counts.pass || 0) + '/' + (counts.warn || 0) + '/' + (counts.fail || 0);
+                            }
+                          }
+
+                          if (overallEl) {
+                            var oLab = '—';
+                            var oCls = 'bench-overall';
+                            if (level === 'block') {
+                              oLab = (typeof t === 'function' ? t('run.benchBlocked') : 'Blocked');
+                              oCls += ' is-block';
+                            } else if (level === 'pilot' || (counts.warn || 0) > 0) {
+                              oLab = (typeof t === 'function' ? t('run.benchWarn') : 'Warnings');
+                              oCls += ' is-warn';
+                            } else {
+                              oLab = (typeof t === 'function' ? t('run.benchReady') : 'Ready');
+                              oCls += ' is-ready';
+                            }
+                            overallEl.textContent = oLab;
+                            overallEl.className = oCls;
+                            overallEl.setAttribute('title', result.reason || '');
+                          }
+
+                          var checks = (result.checks || []).slice();
+                          checks.sort(function (a, b) {
+                            var rank = { fail: 0, warn: 1, pass: 2, info: 3 };
+                            return (rank[a && a.status] != null ? rank[a.status] : 9) - (rank[b && b.status] != null ? rank[b.status] : 9);
+                          });
+
+                          var noteBits = [];
+                          checks.forEach(function (c) {
+                            if (!c) return;
+                            var st = c.status || 'info';
+                            var btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'bench-chip is-' + st;
+                            if (st === 'pass') btn.classList.add('is-hidden-pass');
+                            btn.setAttribute('data-id', c.id || '');
+                            var mark = st === 'pass' ? '\u2713' : (st === 'warn' ? '!' : (st === 'fail' ? '\u00d7' : '\u00b7'));
+                            var short = (c.label || c.id || 'check');
+                            btn.innerHTML = '<span class="bench-chip-mark" aria-hidden="true">' + mark + '</span><span class="bench-chip-lab"></span>';
+                            btn.querySelector('.bench-chip-lab').textContent = short;
+                            var tip = (c.detail || '') + (c.fix_hint ? ('\n\u2192 ' + c.fix_hint) : '');
+                            if (tip) btn.title = tip;
+                            btn.addEventListener('click', function () {
+                              if (!noteEl) return;
+                              if (c.detail || c.fix_hint) {
+                                noteEl.hidden = false;
+                                noteEl.classList.remove('is-warn', 'is-fail');
+                                if (st === 'fail') noteEl.classList.add('is-fail');
+                                else if (st === 'warn') noteEl.classList.add('is-warn');
+                                noteEl.textContent = (c.label || '') + ' \u2014 ' + (c.detail || '') + (c.fix_hint ? (' \u00b7 ' + c.fix_hint) : '');
+                              }
+                            });
+                            chips.appendChild(btn);
+                            if (st === 'warn' || st === 'fail') {
+                              noteBits.push({ st: st, text: (c.label || c.id) + ': ' + (c.detail || '') });
+                            }
+                          });
+
+                          if (noteEl && noteBits.length) {
+                            noteEl.hidden = false;
+                            noteEl.classList.remove('is-warn', 'is-fail');
+                            noteEl.classList.add(noteBits[0].st === 'fail' ? 'is-fail' : 'is-warn');
+                            noteEl.textContent = noteBits[0].text;
+                          } else if (noteEl && (counts.pass || 0) > 0 && !(counts.warn || 0) && !(counts.fail || 0)) {
+                            noteEl.hidden = false;
+                            noteEl.classList.remove('is-warn', 'is-fail');
+                            noteEl.textContent = t('run.benchAllPassed');
+                          }
+
+                          syncBenchDesignDisclosure();
+
+                          try {
+                            window.__psyclawLastDesignPreflight = result;
+                            document.dispatchEvent(new CustomEvent('psyclaw:design-preflight', { detail: result }));
+                          } catch (eE) { /* ignore */ }
+                        }
+
+            async function refreshDesignPreflight() {
+              var design = window.PsyClawBuilder && window.PsyClawBuilder.getDesign
+                ? window.PsyClawBuilder.getDesign()
+                : null;
+              var path = '';
+              try {
+                if (typeof projectPath === 'function') path = projectPath() || '';
+              } catch (eP) { path = ''; }
+              if (!design && !path) {
+                paintDesignPreflight(null);
+                return null;
+              }
+              try {
+                var resp = await fetch('/api/design/preflight', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ design: design, project_path: path || undefined }),
+                });
+                var j = await resp.json().catch(function () { return null; });
+                if (!resp.ok) {
+                  paintDesignPreflight({
+                    ok: false,
+                    level: 'block',
+                    overall: 'block',
+                    counts: { pass: 0, warn: 0, fail: 1 },
+                    checks: [{ id: 'api', label: 'Design preflight', status: 'fail', detail: (j && j.error) || ('HTTP ' + resp.status) }],
+                  });
+                  return lastDesignPreflight;
+                }
+                paintDesignPreflight(j);
+                return j;
+              } catch (e) {
+                paintDesignPreflight({
+                  ok: false,
+                  level: 'block',
+                  overall: 'block',
+                  counts: { pass: 0, warn: 0, fail: 1 },
+                  checks: [{ id: 'api', label: 'Design preflight', status: 'fail', detail: String(e && e.message ? e.message : e) }],
+                });
+                return lastDesignPreflight;
+              }
+            }
+
+            function scheduleDesignPreflight() {
+              if (_designPfTimer) clearTimeout(_designPfTimer);
+              _designPfTimer = setTimeout(function () {
+                refreshDesignPreflight();
+              }, 350);
+            }
+
+            document.addEventListener('psyclaw:project-opened', scheduleDesignPreflight);
+                        document.addEventListener('psyclaw:file-state', scheduleDesignPreflight);
+                        document.addEventListener('psyclaw:design-changed', scheduleDesignPreflight);
+                        setTimeout(function () { refreshDesignPreflight(); }, 600);
+
+                        async function copyBenchValue(targetId, button) {
+                          var target = document.getElementById(targetId);
+                          var value = target
+                            ? String(target.getAttribute('data-copy-value') || target.title || target.textContent || '').trim()
+                            : '';
+                          var na = t('run.notApplicable');
+                          if (!value || value === '—' || value === na) return;
+                          try {
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                              await navigator.clipboard.writeText(value);
+                            } else {
+                              throw new Error('no clipboard');
+                            }
+                          } catch (e) {
+                            var area = document.createElement('textarea');
+                            area.value = value;
+                            area.setAttribute('readonly', '');
+                            area.style.position = 'fixed';
+                            area.style.opacity = '0';
+                            document.body.appendChild(area);
+                            area.select();
+                            try { document.execCommand('copy'); } catch (e2) { /* ignore */ }
+                            area.remove();
+                          }
+                          if (button) {
+                            button.classList.add('is-copied');
+                            button.setAttribute('title', t('run.copyDone'));
+                            setTimeout(function () {
+                              button.classList.remove('is-copied');
+                              button.setAttribute('title', t('run.copyValue'));
+                            }, 1200);
+                          }
+                        }
+
+                        (function wireBenchUi() {
+                          var toggle = document.getElementById('bench-design-toggle');
+                          if (toggle && !toggle.dataset.wired) {
+                            toggle.dataset.wired = '1';
+                            toggle.addEventListener('click', function () {
+                              benchDesignExpanded = !benchDesignExpanded;
+                              syncBenchDesignDisclosure();
+                            });
+                          }
+                          var card = document.getElementById('pilot-instrument-card');
+                          if (card && !card.dataset.copyWired) {
+                            card.dataset.copyWired = '1';
+                            card.addEventListener('click', function (ev) {
+                              var btn = ev.target && ev.target.closest ? ev.target.closest('[data-copy-target]') : null;
+                              if (!btn || !card.contains(btn)) return;
+                              var tid = btn.getAttribute('data-copy-target');
+                              if (tid) copyBenchValue(tid, btn);
+                            });
+                          }
+                        })();
+
+                        async function armRun(modeLabel) {
               // participant: live formal, consumes ID
               // pilot: live window, MANUAL keys, P_pilot, no ID consume
               // autopilot: headless auto-simulate keys (must auto), P_autopilot, capped loops
@@ -1392,6 +1602,26 @@
                   appendLog('ERROR', t('run.noDesign'));
                   setStatus('failed');
                   return;
+                }
+
+                // Design preflight (practice / materials / structure) — alongside host gate
+                var dpf = null;
+                try {
+                  dpf = await refreshDesignPreflight();
+                } catch (ePf) { dpf = lastDesignPreflight; }
+                if (dpf && (dpf.level === 'block' || dpf.overall === 'block' || dpf.ok === false)) {
+                  var failBits = (dpf.checks || []).filter(function (c) { return c && c.status === 'fail'; })
+                    .map(function (c) { return c.label + ': ' + (c.detail || ''); });
+                  appendLog('ERROR', (typeof t === 'function' ? t('run.designGateBlocked') : 'Design blocked') +
+                    (failBits.length ? (' — ' + failBits.join(' · ')) : ''));
+                  setStatus('failed');
+                  return;
+                }
+                if (dpf && (dpf.level === 'pilot' || dpf.overall === 'pilot' || ((dpf.counts || {}).warn > 0))) {
+                  var warnBits = (dpf.checks || []).filter(function (c) { return c && c.status === 'warn'; })
+                    .map(function (c) { return c.label; });
+                  appendLog('WARN', (typeof t === 'function' ? t('run.designGateWarnLog') : 'Design warnings') +
+                    (warnBits.length ? (' — ' + warnBits.join(', ')) : ''));
                 }
 
                 refreshExpUid(true); // new unique id per arm
@@ -1582,6 +1812,8 @@
           }
 
   window.PsyClawRun = {
+    refreshDesignPreflight: typeof refreshDesignPreflight === 'function' ? refreshDesignPreflight : null,
+    getLastDesignPreflight: function () { return typeof lastDesignPreflight !== 'undefined' ? lastDesignPreflight : null; },
     wire: wireRunTab,
   };
 })();

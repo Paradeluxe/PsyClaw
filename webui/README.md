@@ -7,7 +7,7 @@
 
 [English](README.md) · [中文](README.zh-CN.md)
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-0ea5e9)](pyproject.toml)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-API-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
@@ -160,7 +160,7 @@ runs/             server-side run artifacts (gitignored)
 | `docs/design.md` | UI design system |
 | `docs/CONTRACT.md` | Design & API conventions |
 | `docs/RELEASE_CHECKLIST.md` | Maintainer release checklist |
-| `LICENSE` | AGPL-3.0 |
+| `LICENSE` | MIT |
 | `CITATION.cff` | Citation metadata |
 
 ## Checks
@@ -172,4 +172,4 @@ curl -s http://127.0.0.1:8876/api/health
 
 ## License
 
-**AGPL-3.0** — see [LICENSE](LICENSE). PsychoPy is separate third-party software — [NOTICE](NOTICE).
+**MIT** — see [LICENSE](LICENSE). PsychoPy is separate third-party software — [NOTICE](NOTICE).

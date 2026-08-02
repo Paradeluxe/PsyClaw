@@ -7,7 +7,7 @@
 
 [English](README.md) · [中文](README.zh-CN.md)
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-0ea5e9)](pyproject.toml)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-API-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
@@ -160,7 +160,7 @@ runs/             服务端运行产物（gitignore）
 | `docs/design.md` | UI 设计系统 |
 | `docs/CONTRACT.md` | 设计与 API 约定 |
 | `docs/RELEASE_CHECKLIST.md` | 维护者发版清单 |
-| `LICENSE` | AGPL-3.0 |
+| `LICENSE` | MIT |
 | `CITATION.cff` | 引用元数据 |
 
 ## 检查
@@ -172,4 +172,4 @@ curl -s http://127.0.0.1:8876/api/health
 
 ## 许可证
 
-**AGPL-3.0** — 见 [LICENSE](LICENSE)。PsychoPy 为独立第三方软件 — [NOTICE](NOTICE)。
+**MIT** — 见 [LICENSE](LICENSE)。PsychoPy 为独立第三方软件 — [NOTICE](NOTICE)。

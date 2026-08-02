@@ -5,7 +5,7 @@ Maintainer checklist when cutting a version tag.
 ## Before tag
 
 - [ ] Working tree clean; no secrets, tokens, or real participant data
-- [ ] `LICENSE` is AGPL-3.0; `CITATION.cff` version matches `pyproject.toml`
+- [ ] `LICENSE` is MIT; `CITATION.cff` version matches `pyproject.toml`
 - [ ] README matches shipped UI (tabs, `<folderName>.psyclaw`, usage pipeline)
 - [ ] `PSYCLAW_PSYCHOPY_PYTHON` documented; no machine-specific absolute path required
 - [ ] Example projects use relative asset paths only

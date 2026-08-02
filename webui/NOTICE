@@ -2,12 +2,9 @@
 
 ## License
 
-PsyClaw WebUI is licensed under the **GNU Affero General Public License v3.0**
-(AGPL-3.0). See [LICENSE](LICENSE).
+PsyClaw WebUI is licensed under the **MIT License**. See [LICENSE](LICENSE).
 
-Aligned with Paradeluxe/Praasper (AGPL-3.0).
-
-The agent skill is in the same repo: `skills/psyclaw/` (AGPL-3.0).
+The agent skill is in the same repo: `skills/psyclaw/` (MIT).
 
 ## Third-party
 

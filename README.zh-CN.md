@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh-CN.md)
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Skill](https://img.shields.io/badge/AI%20skill-psyclaw-8B5CF6)](https://github.com/Paradeluxe/psyclaw)
 [![Marker](https://img.shields.io/badge/marker-.psyclaw-0ea5e9)](https://github.com/Paradeluxe/psyclaw)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/Paradeluxe/psyclaw)
@@ -261,4 +261,4 @@ python skills/psyclaw/scripts/doctor.py
 
 ## 许可证
 
-**AGPL-3.0** — [LICENSE](LICENSE)。PsychoPy 另计 — [NOTICE](NOTICE)。
+**MIT** — [LICENSE](LICENSE)。PsychoPy 另计 — [NOTICE](NOTICE)。

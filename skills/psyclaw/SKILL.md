@@ -6,7 +6,7 @@ description: >
   if agent-run). Not lab GUI; not Builder XML.
 # Optional metadata (Agent Skills open standard: unknown keys are ignored)
 version: 0.3.12
-license: AGPL-3.0
+license: MIT
 metadata:
   author: Paradeluxe
   open_standard: https://agentskills.io/specification
